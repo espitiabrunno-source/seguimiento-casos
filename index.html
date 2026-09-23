@@ -2,294 +2,521 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tiempo de asignación por caso</title>
- 
-data:,
- 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Case Aging Dashboard</title>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/distn.jsscript>
+
 <style>
-:root{
---bg:#f7f8fa;
---card:#ffffff;
---text:#1a1d23;
---muted:#6b7280;
---border:#e5e7eb;
---accent:#3b5bdb;
---accent-light:#eef1fd;
---danger:#e03131;
---ok:#2f9e44;
---warn:#f08c00;
-}
- 
 *{
-box-sizing:border-box;
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
 }
- 
+
 body{
-margin:0;
-background:var(--bg);
-color:var(--text);
-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#f5f7fb;
+    padding:20px;
 }
- 
-.wrap{
-max-width:1150px;
-margin:auto;
-padding:24px 16px 60px;
+
+.header{
+    background:#002b5c;
+    color:white;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:20px;
 }
- 
-.card{
-background:white;
-border:1px solid var(--border);
-border-radius:12px;
-padding:18px;
-margin-bottom:18px;
-}
- 
+
 h1{
-margin:0 0 8px;
+    margin-bottom:10px;
 }
- 
-.sub{
-color:var(--muted);
+
+.controls{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
 }
- 
-input,
-select{
-width:100%;
-padding:8px 10px;
-border:1px solid var(--border);
-border-radius:8px;
-}
- 
+
 button{
-background:var(--accent);
-color:white;
-border:none;
-border-radius:8px;
-padding:10px 16px;
-cursor:pointer;
+    padding:10px 18px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#0066ff;
+    color:white;
+    font-weight:bold;
 }
- 
-.map-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-gap:10px;
+
+button:hover{
+    background:#004fd6;
 }
- 
-.row-actions{
-display:flex;
-flex-wrap:wrap;
-gap:12px;
-margin-top:15px;
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:15px;
+    margin-bottom:20px;
 }
- 
-.table-scroll{
-overflow-x:auto;
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 2px 6px rgba(0,0,0,.1);
 }
- 
+
+.card h3{
+    font-size:14px;
+    color:#666;
+    margin-bottom:10px;
+}
+
+.card .value{
+    font-size:32px;
+    font-weight:bold;
+}
+
 table{
-width:100%;
-border-collapse:collapse;
+    width:100%;
+    border-collapse:collapse;
+    background:white;
 }
- 
-th,
+
+th{
+    background:#002b5c;
+    color:white;
+    padding:12px;
+    text-align:left;
+}
+
 td{
-border-bottom:1px solid var(--border);
-padding:10px;
-text-align:left;
+    padding:10px;
+    border-bottom:1px solid #ddd;
 }
- 
-.stat{
-background:var(--accent-light);
-padding:12px;
-border-radius:10px;
+
+.critico{
+    background:#ffdddd;
 }
- 
-.summary-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-gap:10px;
+
+.alerta{
+    background:#fff5cc;
 }
- 
-.pill{
-padding:4px 10px;
-border-radius:999px;
-font-size:.8rem;
-font-weight:600;
+
+.ok{
+    background:#ddffdd;
 }
- 
-.pill-danger{
-background:#ffe3e3;
-color:#c92a2a;
+
+.search{
+    width:100%;
+    padding:12px;
+    margin-bottom:15px;
+    border-radius:8px;
+    border:1px solid #ccc;
 }
- 
-.pill-warn{
-background:#fff4e6;
-color:#e67700;
+
+.section{
+    margin-top:25px;
 }
- 
-.pill-ok{
-background:#ebfbee;
-color:#2b8a3e;
+
+#status{
+    margin-top:10px;
+    color:#0066ff;
+    font-weight:bold;
 }
 </style>
- 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
- 
-<script>
-window.onerror = function(message, source, line, col, error){
-console.error("ERROR GLOBAL:", {
-message,
-source,
-line,
-col,
-error
-});
-};
- 
-window.addEventListener("load", () => {
-if(typeof XLSX === "undefined"){
-document.body.innerHTML = `
-<div style="padding:30px;font-family:sans-serif">
-<h2 style="color:red">
-Error cargando la librería XLSX
-</h2>
-</div>
-`;
-}
-});
- 
-function escapeHTML(str){
-return String(str || "")
-.replace(/&/g,"&amp;")
-.replace(/</g,"&lt;")
-.replace(/>/g,"&gt;")
-.replace(/"/g,"&quot;")
-.replace(/'/g,"&#039;");
-}
-</script>
 </head>
- 
+
 <body>
- 
-<div class="wrap">
- 
-<h1>Tiempo de asignación por caso</h1>
- 
-<p class="sub">
-Sube el historial de Salesforce y calcula automáticamente el tiempo de asignación por caso.
-</p>
- 
+
+<div class="header">
+<h1>📊 Case Aging Dashboard</h1>
+<p>Monitoreo de productividad y antigüedad de casos</p>
+</div>
+
+<div class="controls">
+<input type="file" id="fileInput" accept=".xlsx,.xls">
+<button onclick="processFile()">Analizar Excel</button>
+<button onclick="exportExcel()">Exportar Resultado</button>
+</div>
+
+<div id="status"></div>
+
+<div class="cards">
+
 <div class="card">
- 
-<h2>1. Cargar archivo</h2>
- 
-<input type="file" id="f-file" accept=".xlsx,.xls,.csv">
- 
-<div id="map-area" style="display:none;margin-top:20px;">
- 
-<div class="map-grid">
- 
-<div>
-<label>Número del caso</label>
-<select id="map-numcaso"></select>
+<h3>Total Casos</h3>
+<div class="value" id="totalCasos">0</div>
 </div>
- 
-<div>
-<label>Modificado por</label>
-<select id="map-modpor"></select>
+
+<div class="card">
+<h3>Casos > 1 Hora</h3>
+<div class="value" id="mayor1h">0</div>
 </div>
- 
-<div>
-<label>Campo / Evento</label>
-<select id="map-campo"></select>
+
+<div class="card">
+<h3>Casos > 4 Horas</h3>
+<div class="value" id="mayor4h">0</div>
 </div>
- 
-<div>
-<label>Valor nuevo</label>
-<select id="map-valnuevo"></select>
+
+<div class="card">
+<h3>Tiempo Promedio</h3>
+<div class="value" id="promedio">0h</div>
 </div>
- 
-<div>
-<label>Fecha modificación</label>
-<select id="map-fechaevento"></select>
+
 </div>
- 
+
+<div class="section">
+
+<h2>Productividad por Agente</h2>
+
+<table id="agentTable">
+<thead>
+<tr>
+<th>Agente</th>
+<th>Casos</th>
+<th>Promedio Horas</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
 </div>
- 
-<div class="row-actions">
- 
-<div>
-<label>Filtro evento</label>
-<input id="f-keyword" value="propietario">
-</div>
- 
-<div>
-<label>Hora referencia</label>
-<input id="f-ahora" type="datetime-local">
-</div>
- 
-<div>
-<label>Alerta horas</label>
-<input id="f-horas" type="number" value="24">
-</div>
- 
-<div>
-<button id="btn-calc">
-Calcular
-</button>
-</div>
- 
-</div>
- 
-</div>
- 
-</div>
- 
-<div class="card" id="results-card" style="display:none;">
-<h2>Resultados</h2>
- 
-<div class="summary-grid" id="summary"></div>
-</div>
- 
-<div class="card" id="table-card" style="display:none;">
- 
-<div style="margin-bottom:15px;">
-<label>Asignado actualmente a</label>
-<select id="filter-propietario">
-<option value="">Todos</option>
-</select>
-</div>
- 
-<div class="table-scroll">
- 
-<table>
- 
+
+<div class="section">
+
+<h2>Detalle por Caso</h2>
+
+<input
+id="searchInput"
+class="search"
+placeholder="Buscar caso o agente..."
+onkeyup="filterTable()">
+
+<table id="caseTable">
+
 <thead>
 <tr>
 <th>Caso</th>
 <th>Asignado a</th>
-<th>Desde</th>
-<th>Tiempo</th>
-<th>Reasignaciones</th>
+<th>Fecha Asignación</th>
+<th>Horas Asignado</th>
+<th>Horas Sin Movimiento</th>
 <th>Estado</th>
 </tr>
 </thead>
- 
-<tbody id="tbody"></tbody>
- 
+
+<tbody>
+</tbody>
+
 </table>
- 
+
 </div>
- 
-</div>
- 
-</div>
- 
+
 <script>
-console.log("Aplicación cargada correctamente.");
+
+let resultadoFinal=[];
+
+function processFile(){
+
+const file=document.getElementById('fileInput').files[0];
+
+if(!file){
+alert('Seleccione un archivo');
+return;
+}
+
+document.getElementById('status').innerHTML='Procesando archivo...';
+
+const reader=new FileReader();
+
+reader.onload=function(e){
+
+const data=new Uint8Array(e.target.result);
+
+const workbook=XLSX.read(data,{type:'array'});
+
+const sheet=workbook.Sheets[workbook.SheetNames[0]];
+
+const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+
+analizarCasos(rows);
+
+};
+
+reader.readAsArrayBuffer(file);
+
+}
+
+function analizarCasos(rows){
+
+const casos={};
+
+rows.forEach(r=>{
+
+const caso=r["Numero del caso"] ||
+r["Número del caso"] ||
+r["Case Number"];
+
+if(!caso) return;
+
+if(!casos[caso]){
+casos[caso]=[];
+}
+
+casos[caso].push(r);
+
+});
+
+resultadoFinal=[];
+
+let mas1h=0;
+let mas4h=0;
+let totalHoras=0;
+
+const ahora=new Date();
+
+Object.keys(casos).forEach(caso=>{
+
+const eventos=casos[caso];
+
+let ultimaAsignacion=null;
+
+eventos.forEach(ev=>{
+
+const campo=(ev["Campo/Evento"]||"").toString().toLowerCase();
+
+if(
+campo.includes("propietario")
+||
+campo.includes("owner")
+){
+
+const fecha=new Date(ev["Fecha de Modificación"]);
+
+if(
+!ultimaAsignacion ||
+fecha>ultimaAsignacion.fecha
+){
+
+ultimaAsignacion={
+agente:ev["Valor nuevo"],
+fecha:fecha
+};
+
+}
+
+}
+
+});
+
+if(!ultimaAsignacion) return;
+
+let ultimaModificacion=ultimaAsignacion.fecha;
+
+eventos.forEach(ev=>{
+
+const fecha=new Date(
+ev["Última fecha/hora de modificación de caso"]
+||
+ev["Fecha de Modificación"]
+);
+
+if(fecha>ultimaModificacion){
+ultimaModificacion=fecha;
+}
+
+});
+
+const horasAsignado=
+(ahora-ultimaAsignacion.fecha)/
+1000/60/60;
+
+const horasSinMovimiento=
+(ahora-ultimaModificacion)/
+1000/60/60;
+
+let estado="🟢";
+
+if(horasSinMovimiento>4){
+estado="🔴";
+mas4h++;
+}
+else if(horasSinMovimiento>1){
+estado="🟡";
+mas1h++;
+}
+
+totalHoras+=horasAsignado;
+
+resultadoFinal.push({
+caso,
+agente:ultimaAsignacion.agente,
+fechaAsignacion:ultimaAsignacion.fecha,
+horasAsignado,
+horasSinMovimiento,
+estado
+});
+
+});
+
+renderDashboard(mas1h,mas4h,totalHoras);
+renderTablaCasos();
+renderTablaAgentes();
+
+document.getElementById('status').innerHTML=
+'✅ Procesados '+resultadoFinal.length+' casos';
+
+}
+
+function renderDashboard(m1,m4,totalHoras){
+
+document.getElementById("totalCasos").innerHTML=
+resultadoFinal.length;
+
+document.getElementById("mayor1h").innerHTML=
+m1;
+
+document.getElementById("mayor4h").innerHTML=
+m4;
+
+const promedio=
+resultadoFinal.length
+?
+(totalHoras/resultadoFinal.length).toFixed(1)
+:0;
+
+document.getElementById("promedio").innerHTML=
+promedio+"h";
+
+}
+
+function renderTablaCasos(){
+
+const tbody=
+document.querySelector("#caseTable tbody");
+
+tbody.innerHTML="";
+
+resultadoFinal.sort(
+(a,b)=>b.horasSinMovimiento-a.horasSinMovimiento
+);
+
+resultadoFinal.forEach(r=>{
+
+const tr=document.createElement("tr");
+
+if(r.horasSinMovimiento>4){
+tr.className="critico";
+}
+else if(r.horasSinMovimiento>1){
+tr.className="alerta";
+}
+else{
+tr.className="ok";
+}
+
+tr.innerHTML=`
+<td>${r.caso}</td>
+<td>${r.agente}</td>
+<td>${r.fechaAsignacion.toLocaleString()}</td>
+<td>${r.horasAsignado.toFixed(1)}</td>
+<td>${r.horasSinMovimiento.toFixed(1)}</td>
+<td>${r.estado}</td>
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+function renderTablaAgentes(){
+
+const agents={};
+
+resultadoFinal.forEach(r=>{
+
+if(!agents[r.agente]){
+agents[r.agente]={
+casos:0,
+horas:0
+};
+}
+
+agents[r.agente].casos++;
+agents[r.agente].horas+=r.horasAsignado;
+
+});
+
+const tbody=
+document.querySelector("#agentTable tbody");
+
+tbody.innerHTML="";
+
+Object.keys(agents).forEach(agent=>{
+
+const tr=document.createElement("tr");
+
+tr.innerHTML=`
+<td>${agent}</td>
+<td>${agents[agent].casos}</td>
+<td>${(agents[agent].horas/agents[agent].casos).toFixed(1)}</td>
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+function filterTable(){
+
+const filtro=
+document.getElementById("searchInput")
+.value
+.toLowerCase();
+
+const rows=
+document.querySelectorAll("#caseTable tbody tr");
+
+rows.forEach(row=>{
+
+row.style.display=
+row.innerText.toLowerCase()
+.includes(filtro)
+?
+''
+:
+'none';
+
+});
+
+}
+
+function exportExcel(){
+
+const ws=
+XLSX.utils.json_to_sheet(resultadoFinal);
+
+const wb=
+XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(
+wb,
+ws,
+"Resultado"
+);
+
+XLSX.writeFile(
+wb,
+"Case_Aging_Resultado.xlsx"
+);
+
+}
+
 </script>
- 
+
 </body>
 </html>
