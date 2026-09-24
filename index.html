@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Case Aging Dashboard</title>
 
-<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/distn.jsscript>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
 <style>
 *{
     margin:0;
     padding:0;
     box-sizing:border-box;
-    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
+    font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;
 }
 
 body{
@@ -36,7 +36,8 @@ h1{
     display:flex;
     gap:10px;
     flex-wrap:wrap;
-    margin-bottom:20px;
+    align-items:center;
+    margin-bottom:10px;
 }
 
 button{
@@ -49,8 +50,20 @@ button{
     font-weight:bold;
 }
 
-button:hover{
+button:disabled{
+    background:#a9b8d8;
+    cursor:not-allowed;
+}
+
+button:hover:not(:disabled){
     background:#004fd6;
+}
+
+input[type=file]{
+    background:white;
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
 }
 
 .cards{
@@ -89,6 +102,8 @@ th{
     color:white;
     padding:12px;
     text-align:left;
+    position:sticky;
+    top:0;
 }
 
 td{
@@ -96,17 +111,9 @@ td{
     border-bottom:1px solid #ddd;
 }
 
-.critico{
-    background:#ffdddd;
-}
-
-.alerta{
-    background:#fff5cc;
-}
-
-.ok{
-    background:#ddffdd;
-}
+.critico{ background:#ffdddd; }
+.alerta{ background:#fff5cc; }
+.ok{ background:#ddffdd; }
 
 .search{
     width:100%;
@@ -120,10 +127,32 @@ td{
     margin-top:25px;
 }
 
+.table-wrap{
+    max-height:520px;
+    overflow:auto;
+    border-radius:12px;
+}
+
 #status{
     margin-top:10px;
-    color:#0066ff;
     font-weight:bold;
+    min-height:20px;
+}
+
+#status.ok-msg{ color:#0a8a2c; }
+#status.err-msg{ color:#c0392b; }
+#status.info-msg{ color:#0066ff; }
+
+#lastUpdate{
+    font-size:13px;
+    color:#666;
+    margin-bottom:15px;
+}
+
+.hint{
+    font-size:12px;
+    color:#888;
+    margin-top:4px;
 }
 </style>
 </head>
@@ -132,16 +161,18 @@ td{
 
 <div class="header">
 <h1>📊 Case Aging Dashboard</h1>
-<p>Monitoreo de productividad y antigüedad de casos</p>
+<p>Monitoreo de productividad y antigüedad de casos (reporte de Gestión de Asignaciones)</p>
 </div>
 
 <div class="controls">
 <input type="file" id="fileInput" accept=".xlsx,.xls">
-<button onclick="processFile()">Analizar Excel</button>
-<button onclick="exportExcel()">Exportar Resultado</button>
+<button id="btnAnalizar" onclick="processFile()">Analizar Excel</button>
+<button id="btnActualizar" onclick="recalcularAhora()" disabled>🔄 Recalcular horas</button>
+<button id="btnExportar" onclick="exportExcel()" disabled>Exportar Resultado</button>
 </div>
 
 <div id="status"></div>
+<div id="lastUpdate"></div>
 
 <div class="cards">
 
@@ -151,12 +182,12 @@ td{
 </div>
 
 <div class="card">
-<h3>Casos > 1 Hora</h3>
+<h3>Casos &gt; 1 Hora</h3>
 <div class="value" id="mayor1h">0</div>
 </div>
 
 <div class="card">
-<h3>Casos > 4 Horas</h3>
+<h3>Casos &gt; 4 Horas</h3>
 <div class="value" id="mayor4h">0</div>
 </div>
 
@@ -168,24 +199,22 @@ td{
 </div>
 
 <div class="section">
-
 <h2>Productividad por Agente</h2>
-
+<div class="table-wrap">
 <table id="agentTable">
 <thead>
 <tr>
 <th>Agente</th>
-<th>Casos</th>
+<th>Casos Asignados</th>
 <th>Promedio Horas</th>
 </tr>
 </thead>
 <tbody></tbody>
 </table>
-
+</div>
 </div>
 
 <div class="section">
-
 <h2>Detalle por Caso</h2>
 
 <input
@@ -194,328 +223,422 @@ class="search"
 placeholder="Buscar caso o agente..."
 onkeyup="filterTable()">
 
+<div class="table-wrap">
 <table id="caseTable">
-
 <thead>
 <tr>
 <th>Caso</th>
 <th>Asignado a</th>
-<th>Fecha Asignación</th>
-<th>Horas Asignado</th>
-<th>Horas Sin Movimiento</th>
+<th>Última Asignación (COT)</th>
+<th>Horas Transcurridas</th>
 <th>Estado</th>
 </tr>
 </thead>
-
-<tbody>
-</tbody>
-
+<tbody></tbody>
 </table>
-
+</div>
 </div>
 
 <script>
+/* =========================================================
+   ESTADO GLOBAL
+   ========================================================= */
 
-let resultadoFinal=[];
+// Datos "crudos": un registro por caso con su último evento de
+// asignación (Campo/Evento = Propietario del caso) y la fecha
+// real de ese evento, ya normalizada a UTC (ver parseFechaCOT).
+let casosRaw = []; // [{ caso, agente, fechaAsignacion: Date }]
+
+let autoRefreshTimer = null;
+
+/* =========================================================
+   UTILIDADES DE TEXTO / FECHA
+   ========================================================= */
+
+// Quita tildes y pasa a minúsculas para poder comparar encabezados
+// sin importar acentos ni mayúsculas.
+function norm(str){
+    return (str === null || str === undefined ? '' : String(str))
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g,'')
+        .toLowerCase()
+        .trim();
+}
+
+// El reporte se genera en "hora estándar de Colombia/COT" (UTC-5,
+// sin horario de verano). Para que el cálculo de horas transcurridas
+// dé el mismo resultado sin importar la zona horaria del navegador
+// del usuario, toda fecha del Excel se convierte a un instante UTC
+// real sumando 5 horas al valor "de pared" que trae la celda.
+function fechaCOTaUTC(y,m,d,h,min){
+    return new Date(Date.UTC(y, m-1, d, h+5, min, 0));
+}
+
+// Convierte el valor de la celda "Fecha de modificación" a un Date
+// real, sin importar si SheetJS la entregó como texto
+// ("24/09/2026 07:09 AM"), como número de serie de Excel, o como
+// objeto Date.
+function parseFechaModificacion(value){
+    if (value === null || value === undefined || value === '') return null;
+
+    if (value instanceof Date && !isNaN(value)){
+        return fechaCOTaUTC(
+            value.getFullYear(), value.getMonth()+1, value.getDate(),
+            value.getHours(), value.getMinutes()
+        );
+    }
+
+    if (typeof value === 'number'){
+        const d = XLSX.SSF.parse_date_code(value);
+        if (!d) return null;
+        return fechaCOTaUTC(d.y, d.m, d.d, d.H || 0, d.M || 0);
+    }
+
+    // Formato esperado: DD/MM/YYYY HH:MM AM/PM
+    const m = String(value).trim().match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*([AP]M)$/i
+    );
+    if (!m) return null;
+
+    let [, dd, mm, yyyy, hh, min, ampm] = m;
+    dd = +dd; mm = +mm; yyyy = +yyyy; hh = +hh; min = +min;
+    if (/pm/i.test(ampm) && hh !== 12) hh += 12;
+    if (/am/i.test(ampm) && hh === 12) hh = 0;
+
+    return fechaCOTaUTC(yyyy, mm, dd, hh, min);
+}
+
+/* =========================================================
+   LECTURA DEL EXCEL (reporte "Gestión de Asignaciones")
+   ========================================================= */
 
 function processFile(){
 
-const file=document.getElementById('fileInput').files[0];
+    const file = document.getElementById('fileInput').files[0];
 
-if(!file){
-alert('Seleccione un archivo');
-return;
+    if (!file){
+        setStatus('Selecciona un archivo primero.', 'err-msg');
+        return;
+    }
+
+    setStatus('Procesando archivo...', 'info-msg');
+    document.getElementById('btnAnalizar').disabled = true;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+        try{
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type:'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            // header:1 => matriz de filas/columnas cruda, tal cual viene
+            // el reporte (con sus filas de metadatos, subtotales, etc.)
+            const matrix = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
+
+            analizarReporte(matrix);
+        }catch(err){
+            console.error(err);
+            setStatus('❌ No se pudo leer el archivo: ' + err.message, 'err-msg');
+        }finally{
+            document.getElementById('btnAnalizar').disabled = false;
+        }
+    };
+
+    reader.onerror = function(){
+        setStatus('❌ Error leyendo el archivo.', 'err-msg');
+        document.getElementById('btnAnalizar').disabled = false;
+    };
+
+    reader.readAsArrayBuffer(file);
 }
 
-document.getElementById('status').innerHTML='Procesando archivo...';
+// Busca, dentro de las primeras filas, la fila de encabezados real
+// (la que contiene "Número del caso"), y devuelve su índice y el
+// índice de cada columna que nos interesa, identificándolas por
+// nombre para no depender de que estén siempre en la misma posición.
+function detectarEncabezados(matrix){
 
-const reader=new FileReader();
+    let headerRowIdx = -1;
+    let cols = {};
 
-reader.onload=function(e){
+    for (let i = 0; i < Math.min(matrix.length, 50); i++){
+        const row = matrix[i] || [];
+        for (let j = 0; j < row.length; j++){
+            const cell = norm(row[j]);
+            if (cell.includes('numero del caso') || cell === 'case number'){
+                headerRowIdx = i;
+                break;
+            }
+        }
+        if (headerRowIdx !== -1) break;
+    }
 
-const data=new Uint8Array(e.target.result);
+    if (headerRowIdx === -1) return null;
 
-const workbook=XLSX.read(data,{type:'array'});
+    const headerRow = matrix[headerRowIdx];
 
-const sheet=workbook.Sheets[workbook.SheetNames[0]];
+    headerRow.forEach((cell, idx) => {
+        const c = norm(cell);
+        if (c.includes('numero del caso') || c === 'case number'){
+            cols.caso = idx;
+        } else if (c.includes('propietario del caso') || c.includes('case owner')){
+            cols.propietario = idx;
+        } else if (c.includes('campo') && c.includes('evento')){
+            cols.evento = idx;
+        }else if (c.includes('field') && c.includes('event')){
+            cols.evento = idx;
+        } else if (c.includes('valor nuevo') || c === 'new value'){
+            cols.valorNuevo = idx;
+        } else if (c.includes('fecha de modificacion') || c.includes('last modified date')){
+            cols.fecha = idx;
+        }
+    });
 
-const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
-
-analizarCasos(rows);
-
-};
-
-reader.readAsArrayBuffer(file);
-
+    return { headerRowIdx, cols };
 }
 
-function analizarCasos(rows){
+function analizarReporte(matrix){
 
-const casos={};
+    const detectado = detectarEncabezados(matrix);
 
-rows.forEach(r=>{
+    if (!detectado){
+        setStatus('❌ No se encontró la columna "Número del caso". Verifica que sea el reporte de Gestión de Asignaciones exportado de Salesforce.', 'err-msg');
+        return;
+    }
 
-const caso=r["Numero del caso"] ||
-r["Número del caso"] ||
-r["Case Number"];
+    const { headerRowIdx, cols } = detectado;
 
-if(!caso) return;
+    if (cols.caso === undefined || cols.evento === undefined || cols.fecha === undefined){
+        setStatus('❌ Faltan columnas obligatorias en el Excel (Número del caso / Campo-Evento / Fecha de modificación).', 'err-msg');
+        return;
+    }
 
-if(!casos[caso]){
-casos[caso]=[];
+    // Mapa caso -> { agente, fechaAsignacion } quedándonos siempre con
+    // el evento de "Propietario del caso" MÁS RECIENTE de cada caso.
+    const mapa = {};
+    let currentCase = null;
+    let filasIgnoradas = 0;
+
+    for (let r = headerRowIdx + 1; r < matrix.length; r++){
+
+        const row = matrix[r] || [];
+        const caseCell = String(row[cols.caso] ?? '').trim();
+        const caseCellLower = caseCell.toLowerCase();
+
+        // Fila "Total" => fin de la tabla de datos.
+        if (caseCellLower === 'total') break;
+
+        // Fila "Subtotal" => se ignora, no es un evento.
+        if (caseCellLower === 'subtotal') continue;
+
+        // Si esta fila trae número de caso, abre/continúa ese grupo
+        // (las filas siguientes del mismo caso vienen con esta celda
+        // vacía por el agrupamiento del reporte de Salesforce).
+        if (caseCell) currentCase = caseCell;
+
+        const eventoCell = String(row[cols.evento] ?? '').trim();
+
+        // Filas sin Campo/Evento son filas de "Conteo"/estructura, no eventos.
+        if (!eventoCell){
+            continue;
+        }
+
+        if (!norm(eventoCell).includes('propietario') && !norm(eventoCell).includes('owner')){
+            // Por si el archivo trae otros tipos de evento mezclados,
+            // solo nos interesan los cambios de propietario del caso.
+            continue;
+        }
+
+        if (!currentCase){
+            filasIgnoradas++;
+            continue;
+        }
+
+        const fecha = parseFechaModificacion(row[cols.fecha]);
+        if (!fecha){
+            filasIgnoradas++;
+            continue;
+        }
+
+        const agente =
+            String(row[cols.propietario] ?? '').trim() ||
+            String(row[cols.valorNuevo] ?? '').trim() ||
+            'Sin asignar';
+
+        if (!mapa[currentCase] || fecha > mapa[currentCase].fechaAsignacion){
+            mapa[currentCase] = { caso: currentCase, agente, fechaAsignacion: fecha };
+        }
+    }
+
+    casosRaw = Object.values(mapa);
+
+    if (casosRaw.length === 0){
+        setStatus('⚠️ No se encontraron casos con eventos de "Propietario del caso" en el archivo.', 'err-msg');
+        document.getElementById('btnActualizar').disabled = true;
+        document.getElementById('btnExportar').disabled = true;
+        return;
+    }
+
+    document.getElementById('btnActualizar').disabled = false;
+    document.getElementById('btnExportar').disabled = false;
+
+    renderAll();
+
+    let msg = '✅ Procesados ' + casosRaw.length + ' casos.';
+    if (filasIgnoradas > 0) msg += ' (' + filasIgnoradas + ' filas ignoradas por datos incompletos)';
+    setStatus(msg, 'ok-msg');
+
+    iniciarAutoRefresh();
 }
 
-casos[caso].push(r);
+/* =========================================================
+   CÁLCULO Y RENDERIZADO (usa "ahora" en tiempo real)
+   ========================================================= */
 
-});
-
-resultadoFinal=[];
-
-let mas1h=0;
-let mas4h=0;
-let totalHoras=0;
-
-const ahora=new Date();
-
-Object.keys(casos).forEach(caso=>{
-
-const eventos=casos[caso];
-
-let ultimaAsignacion=null;
-
-eventos.forEach(ev=>{
-
-const campo=(ev["Campo/Evento"]||"").toString().toLowerCase();
-
-if(
-campo.includes("propietario")
-||
-campo.includes("owner")
-){
-
-const fecha=new Date(ev["Fecha de Modificación"]);
-
-if(
-!ultimaAsignacion ||
-fecha>ultimaAsignacion.fecha
-){
-
-ultimaAsignacion={
-agente:ev["Valor nuevo"],
-fecha:fecha
-};
-
+function recalcularAhora(){
+    if (casosRaw.length === 0) return;
+    renderAll();
+    setStatus('🔄 Horas recalculadas con la hora actual.', 'ok-msg');
 }
 
+function iniciarAutoRefresh(){
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    // Recalcula automáticamente cada minuto para que el "tiempo
+    // transcurrido" se mantenga al día entre carga y carga del Excel.
+    autoRefreshTimer = setInterval(renderAll, 60 * 1000);
 }
 
-});
+function calcularDerivados(){
+    const ahora = new Date();
 
-if(!ultimaAsignacion) return;
-
-let ultimaModificacion=ultimaAsignacion.fecha;
-
-eventos.forEach(ev=>{
-
-const fecha=new Date(
-ev["Última fecha/hora de modificación de caso"]
-||
-ev["Fecha de Modificación"]
-);
-
-if(fecha>ultimaModificacion){
-ultimaModificacion=fecha;
+    return casosRaw.map(c => {
+        const horas = (ahora - c.fechaAsignacion) / 3600000;
+        let estado = '🟢';
+        if (horas > 4) estado = '🔴';
+        else if (horas > 1) estado = '🟡';
+        return { ...c, horas, estado };
+    });
 }
 
-});
-
-const horasAsignado=
-(ahora-ultimaAsignacion.fecha)/
-1000/60/60;
-
-const horasSinMovimiento=
-(ahora-ultimaModificacion)/
-1000/60/60;
-
-let estado="🟢";
-
-if(horasSinMovimiento>4){
-estado="🔴";
-mas4h++;
-}
-else if(horasSinMovimiento>1){
-estado="🟡";
-mas1h++;
+function renderAll(){
+    const datos = calcularDerivados();
+    renderDashboard(datos);
+    renderTablaCasos(datos);
+    renderTablaAgentes(datos);
+    document.getElementById('lastUpdate').textContent =
+        'Última actualización: ' + new Date().toLocaleString('es-CO');
 }
 
-totalHoras+=horasAsignado;
+function renderDashboard(datos){
+    const mas1h = datos.filter(d => d.horas > 1 && d.horas <= 4).length;
+    const mas4h = datos.filter(d => d.horas > 4).length;
+    const promedio = datos.length
+        ? (datos.reduce((s,d) => s + d.horas, 0) / datos.length).toFixed(1)
+        : 0;
 
-resultadoFinal.push({
-caso,
-agente:ultimaAsignacion.agente,
-fechaAsignacion:ultimaAsignacion.fecha,
-horasAsignado,
-horasSinMovimiento,
-estado
-});
-
-});
-
-renderDashboard(mas1h,mas4h,totalHoras);
-renderTablaCasos();
-renderTablaAgentes();
-
-document.getElementById('status').innerHTML=
-'✅ Procesados '+resultadoFinal.length+' casos';
-
+    document.getElementById('totalCasos').textContent = datos.length;
+    document.getElementById('mayor1h').textContent = mas1h;
+    document.getElementById('mayor4h').textContent = mas4h;
+    document.getElementById('promedio').textContent = promedio + 'h';
 }
 
-function renderDashboard(m1,m4,totalHoras){
+function renderTablaCasos(datos){
+    const tbody = document.querySelector('#caseTable tbody');
+    tbody.innerHTML = '';
 
-document.getElementById("totalCasos").innerHTML=
-resultadoFinal.length;
+    const ordenado = [...datos].sort((a,b) => b.horas - a.horas);
 
-document.getElementById("mayor1h").innerHTML=
-m1;
-
-document.getElementById("mayor4h").innerHTML=
-m4;
-
-const promedio=
-resultadoFinal.length
-?
-(totalHoras/resultadoFinal.length).toFixed(1)
-:0;
-
-document.getElementById("promedio").innerHTML=
-promedio+"h";
-
+    ordenado.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = r.horas > 4 ? 'critico' : (r.horas > 1 ? 'alerta' : 'ok');
+        tr.innerHTML = `
+            <td>${escapeHtml(r.caso)}</td>
+            <td>${escapeHtml(r.agente)}</td>
+            <td>${r.fechaAsignacion.toLocaleString('es-CO', { timeZone:'America/Bogota' })}</td>
+            <td>${r.horas.toFixed(1)}</td>
+            <td>${r.estado}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
-function renderTablaCasos(){
+function renderTablaAgentes(datos){
+    const agentes = {};
 
-const tbody=
-document.querySelector("#caseTable tbody");
+    datos.forEach(r => {
+        if (!agentes[r.agente]) agentes[r.agente] = { casos:0, horas:0 };
+        agentes[r.agente].casos++;
+        agentes[r.agente].horas += r.horas;
+    });
 
-tbody.innerHTML="";
+    const tbody = document.querySelector('#agentTable tbody');
+    tbody.innerHTML = '';
 
-resultadoFinal.sort(
-(a,b)=>b.horasSinMovimiento-a.horasSinMovimiento
-);
-
-resultadoFinal.forEach(r=>{
-
-const tr=document.createElement("tr");
-
-if(r.horasSinMovimiento>4){
-tr.className="critico";
-}
-else if(r.horasSinMovimiento>1){
-tr.className="alerta";
-}
-else{
-tr.className="ok";
-}
-
-tr.innerHTML=`
-<td>${r.caso}</td>
-<td>${r.agente}</td>
-<td>${r.fechaAsignacion.toLocaleString()}</td>
-<td>${r.horasAsignado.toFixed(1)}</td>
-<td>${r.horasSinMovimiento.toFixed(1)}</td>
-<td>${r.estado}</td>
-`;
-
-tbody.appendChild(tr);
-
-});
-
+    Object.keys(agentes)
+        .sort((a,b) => agentes[b].casos - agentes[a].casos)
+        .forEach(agente => {
+            const a = agentes[agente];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(agente)}</td>
+                <td>${a.casos}</td>
+                <td>${(a.horas / a.casos).toFixed(1)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
 }
 
-function renderTablaAgentes(){
-
-const agents={};
-
-resultadoFinal.forEach(r=>{
-
-if(!agents[r.agente]){
-agents[r.agente]={
-casos:0,
-horas:0
-};
-}
-
-agents[r.agente].casos++;
-agents[r.agente].horas+=r.horasAsignado;
-
-});
-
-const tbody=
-document.querySelector("#agentTable tbody");
-
-tbody.innerHTML="";
-
-Object.keys(agents).forEach(agent=>{
-
-const tr=document.createElement("tr");
-
-tr.innerHTML=`
-<td>${agent}</td>
-<td>${agents[agent].casos}</td>
-<td>${(agents[agent].horas/agents[agent].casos).toFixed(1)}</td>
-`;
-
-tbody.appendChild(tr);
-
-});
-
-}
+/* =========================================================
+   BÚSQUEDA / EXPORTACIÓN / HELPERS
+   ========================================================= */
 
 function filterTable(){
-
-const filtro=
-document.getElementById("searchInput")
-.value
-.toLowerCase();
-
-const rows=
-document.querySelectorAll("#caseTable tbody tr");
-
-rows.forEach(row=>{
-
-row.style.display=
-row.innerText.toLowerCase()
-.includes(filtro)
-?
-''
-:
-'none';
-
-});
-
+    const filtro = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#caseTable tbody tr');
+    rows.forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(filtro) ? '' : 'none';
+    });
 }
 
 function exportExcel(){
+    if (casosRaw.length === 0) return;
 
-const ws=
-XLSX.utils.json_to_sheet(resultadoFinal);
+    const datos = calcularDerivados();
+    const filas = datos
+        .sort((a,b) => b.horas - a.horas)
+        .map(r => ({
+            'Caso': r.caso,
+            'Asignado a': r.agente,
+            'Última Asignación (COT)': r.fechaAsignacion.toLocaleString('es-CO', { timeZone:'America/Bogota' }),
+            'Horas Transcurridas': +r.horas.toFixed(2),
+            'Estado': r.estado
+        }));
 
-const wb=
-XLSX.utils.book_new();
-
-XLSX.utils.book_append_sheet(
-wb,
-ws,
-"Resultado"
-);
-
-XLSX.writeFile(
-wb,
-"Case_Aging_Resultado.xlsx"
-);
-
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Resultado');
+    XLSX.writeFile(wb, 'Case_Aging_Resultado.xlsx');
 }
 
+function setStatus(msg, cls){
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = cls || '';
+}
+
+function escapeHtml(str){
+    return String(str)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;');
+}
+
+// Permite analizar apenas se selecciona el archivo, sin tener que
+// pulsar además el botón (queda igual disponible por comodidad).
+document.getElementById('fileInput').addEventListener('change', function(){
+    if (this.files[0]) processFile();
+});
 </script>
 
 </body>
