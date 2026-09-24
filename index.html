@@ -1,644 +1,2124 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Case Aging Dashboard</title>
+
+<!-- SheetJS: lectura y exportación de Excel directamente en el navegador -->
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
-body{
-    background:#f5f7fb;
-    padding:20px;
+:root {
+    --azul: #002b5c;
+    --azul-claro: #0066ff;
+    --azul-hover: #004fd6;
+    --fondo: #f5f7fb;
+    --blanco: #ffffff;
+    --texto: #1f2937;
+    --gris: #6b7280;
+    --borde: #d9dee8;
+    --verde: #198754;
+    --amarillo: #f0ad00;
+    --rojo: #dc3545;
 }
 
-.header{
-    background:#002b5c;
-    color:white;
-    padding:20px;
-    border-radius:12px;
-    margin-bottom:20px;
+body {
+    background: var(--fondo);
+    color: var(--texto);
+    padding: 20px;
+    min-height: 100vh;
 }
 
-h1{
-    margin-bottom:10px;
+/* =========================================================
+   ENCABEZADO
+   ========================================================= */
+
+.header {
+    background: linear-gradient(135deg, #002b5c, #004a8f);
+    color: white;
+    padding: 25px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0, 43, 92, 0.15);
 }
 
-.controls{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    align-items:center;
-    margin-bottom:10px;
+.header h1 {
+    margin-bottom: 8px;
+    font-size: 28px;
 }
 
-button{
-    padding:10px 18px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-    background:#0066ff;
-    color:white;
-    font-weight:bold;
+.header p {
+    opacity: 0.9;
+    font-size: 14px;
 }
 
-button:disabled{
-    background:#a9b8d8;
-    cursor:not-allowed;
+/* =========================================================
+   CONTROLES
+   ========================================================= */
+
+.controls {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    margin-bottom: 15px;
+
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
-button:hover:not(:disabled){
-    background:#004fd6;
+.file-area {
+    flex: 1;
+    min-width: 260px;
 }
 
-input[type=file]{
-    background:white;
-    padding:8px;
-    border-radius:8px;
-    border:1px solid #ccc;
+input[type="file"] {
+    width: 100%;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--borde);
+    cursor: pointer;
 }
 
-.cards{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-    gap:15px;
-    margin-bottom:20px;
+button {
+    padding: 11px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--azul-claro);
+    color: white;
+    font-weight: 600;
+    transition: 0.2s;
 }
 
-.card{
-    background:white;
-    padding:20px;
-    border-radius:12px;
-    box-shadow:0 2px 6px rgba(0,0,0,.1);
+button:hover:not(:disabled) {
+    background: var(--azul-hover);
+    transform: translateY(-1px);
 }
 
-.card h3{
-    font-size:14px;
-    color:#666;
-    margin-bottom:10px;
+button:disabled {
+    background: #aeb9ca;
+    cursor: not-allowed;
+    transform: none;
 }
 
-.card .value{
-    font-size:32px;
-    font-weight:bold;
+.btn-secondary {
+    background: #52657a;
 }
 
-table{
-    width:100%;
-    border-collapse:collapse;
-    background:white;
+.btn-secondary:hover:not(:disabled) {
+    background: #3d4e60;
 }
 
-th{
-    background:#002b5c;
-    color:white;
-    padding:12px;
-    text-align:left;
-    position:sticky;
-    top:0;
+/* =========================================================
+   ESTADO
+   ========================================================= */
+
+#status {
+    margin-bottom: 10px;
+    font-weight: 600;
+    min-height: 22px;
 }
 
-td{
-    padding:10px;
-    border-bottom:1px solid #ddd;
+#status.ok-msg {
+    color: var(--verde);
 }
 
-.critico{ background:#ffdddd; }
-.alerta{ background:#fff5cc; }
-.ok{ background:#ddffdd; }
-
-.search{
-    width:100%;
-    padding:12px;
-    margin-bottom:15px;
-    border-radius:8px;
-    border:1px solid #ccc;
+#status.err-msg {
+    color: var(--rojo);
 }
 
-.section{
-    margin-top:25px;
+#status.info-msg {
+    color: var(--azul-claro);
 }
 
-.table-wrap{
-    max-height:520px;
-    overflow:auto;
-    border-radius:12px;
+#lastUpdate {
+    font-size: 13px;
+    color: var(--gris);
+    margin-bottom: 18px;
 }
 
-#status{
-    margin-top:10px;
-    font-weight:bold;
-    min-height:20px;
+/* =========================================================
+   INDICADOR DE ARCHIVO
+   ========================================================= */
+
+.file-info {
+    display: none;
+    background: #eef6ff;
+    border: 1px solid #c9e1ff;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    font-size: 13px;
 }
 
-#status.ok-msg{ color:#0a8a2c; }
-#status.err-msg{ color:#c0392b; }
-#status.info-msg{ color:#0066ff; }
-
-#lastUpdate{
-    font-size:13px;
-    color:#666;
-    margin-bottom:15px;
+.file-info strong {
+    color: var(--azul);
 }
 
-.hint{
-    font-size:12px;
-    color:#888;
-    margin-top:4px;
+/* =========================================================
+   TARJETAS
+   ========================================================= */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.07);
+    border-left: 5px solid var(--azul-claro);
+}
+
+.card h3 {
+    font-size: 14px;
+    color: var(--gris);
+    margin-bottom: 10px;
+}
+
+.card .value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--texto);
+}
+
+/* =========================================================
+   SECCIONES
+   ========================================================= */
+
+.section {
+    margin-top: 25px;
+    margin-bottom: 25px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.section h2 {
+    color: var(--azul);
+    font-size: 20px;
+}
+
+/* =========================================================
+   TABLAS
+   ========================================================= */
+
+.table-wrap {
+    max-height: 520px;
+    overflow: auto;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.06);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+th {
+    background: var(--azul);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    white-space: nowrap;
+}
+
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+}
+
+tbody tr:hover {
+    filter: brightness(0.98);
+}
+
+.critico {
+    background: #ffe0e0;
+}
+
+.alerta {
+    background: #fff6d6;
+}
+
+.ok {
+    background: #e2f7e8;
+}
+
+/* =========================================================
+   BUSCADOR
+   ========================================================= */
+
+.search {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--borde);
+    outline: none;
+    font-size: 14px;
+    background: white;
+}
+
+.search:focus {
+    border-color: var(--azul-claro);
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+/* =========================================================
+   PIE
+   ========================================================= */
+
+.footer {
+    text-align: center;
+    color: #7b8490;
+    font-size: 12px;
+    margin-top: 30px;
+    padding: 15px;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    body {
+        padding: 10px;
+    }
+
+    .header h1 {
+        font-size: 22px;
+    }
+
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    button {
+        width: 100%;
+    }
+
+    .file-area {
+        width: 100%;
+    }
+
+    .card .value {
+        font-size: 25px;
+    }
+
+    th,
+    td {
+        padding: 8px;
+        font-size: 12px;
+    }
 }
 </style>
+
 </head>
 
 <body>
 
+<!-- =========================================================
+     ENCABEZADO
+     ========================================================= -->
+
 <div class="header">
-<h1>📊 Case Aging Dashboard</h1>
-<p>Monitoreo de productividad y antigüedad de casos (reporte de Gestión de Asignaciones)</p>
+    <h1>📊 Case Aging Dashboard</h1>
+
+```
+<p>
+    Cálculo automático del tiempo de asignación de casos
+    utilizando el reporte de Gestión de Asignaciones.
+</p>
+```
+
 </div>
 
+<!-- =========================================================
+     CONTROLES
+     ========================================================= -->
+
 <div class="controls">
-<input type="file" id="fileInput" accept=".xlsx,.xls">
-<button id="btnAnalizar" onclick="processFile()">Analizar Excel</button>
-<button id="btnActualizar" onclick="recalcularAhora()" disabled>🔄 Recalcular horas</button>
-<button id="btnExportar" onclick="exportExcel()" disabled>Exportar Resultado</button>
+
+```
+<div class="file-area">
+    <input
+        type="file"
+        id="fileInput"
+        accept=".xlsx,.xls"
+        aria-label="Seleccionar archivo Excel">
+</div>
+
+<button
+    id="btnAnalizar"
+    onclick="processFile()">
+    📂 Analizar Excel
+</button>
+
+<button
+    id="btnActualizar"
+    class="btn-secondary"
+    onclick="recalcularAhora()"
+    disabled>
+    🔄 Recalcular
+</button>
+
+<button
+    id="btnExportar"
+    onclick="exportExcel()"
+    disabled>
+    📥 Exportar Resultado
+</button>
+```
+
 </div>
 
 <div id="status"></div>
+
 <div id="lastUpdate"></div>
+
+<div id="fileInfo" class="file-info"></div>
+
+<!-- =========================================================
+     DASHBOARD
+     ========================================================= -->
 
 <div class="cards">
 
+```
 <div class="card">
-<h3>Total Casos</h3>
-<div class="value" id="totalCasos">0</div>
+    <h3>Total de casos</h3>
+    <div class="value" id="totalCasos">0</div>
 </div>
 
 <div class="card">
-<h3>Casos &gt; 1 Hora</h3>
-<div class="value" id="mayor1h">0</div>
+    <h3>Casos &gt; 1 hora</h3>
+    <div class="value" id="mayor1h">0</div>
 </div>
 
 <div class="card">
-<h3>Casos &gt; 4 Horas</h3>
-<div class="value" id="mayor4h">0</div>
+    <h3>Casos &gt; 4 horas</h3>
+    <div class="value" id="mayor4h">0</div>
 </div>
 
 <div class="card">
-<h3>Tiempo Promedio</h3>
-<div class="value" id="promedio">0h</div>
+    <h3>Tiempo promedio</h3>
+    <div class="value" id="promedio">0h</div>
 </div>
+```
 
 </div>
+
+<!-- =========================================================
+     PRODUCTIVIDAD POR AGENTE
+     ========================================================= -->
 
 <div class="section">
-<h2>Productividad por Agente</h2>
+
+```
+<div class="section-header">
+    <h2>👤 Productividad por Agente</h2>
+</div>
+
 <div class="table-wrap">
-<table id="agentTable">
-<thead>
-<tr>
-<th>Agente</th>
-<th>Casos Asignados</th>
-<th>Promedio Horas</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
+
+    <table id="agentTable">
+
+        <thead>
+            <tr>
+                <th>Agente</th>
+                <th>Casos asignados</th>
+                <th>Promedio horas</th>
+            </tr>
+        </thead>
+
+        <tbody></tbody>
+
+    </table>
+
 </div>
+```
+
 </div>
 
+<!-- =========================================================
+     DETALLE DE CASOS
+     ========================================================= -->
+
 <div class="section">
-<h2>Detalle por Caso</h2>
+
+```
+<div class="section-header">
+    <h2>📋 Detalle por Caso</h2>
+</div>
 
 <input
-id="searchInput"
-class="search"
-placeholder="Buscar caso o agente..."
-onkeyup="filterTable()">
+    id="searchInput"
+    class="search"
+    type="search"
+    placeholder="Buscar por caso o agente..."
+    autocomplete="off">
 
 <div class="table-wrap">
-<table id="caseTable">
-<thead>
-<tr>
-<th>Caso</th>
-<th>Asignado a</th>
-<th>Última Asignación (COT)</th>
-<th>Horas Transcurridas</th>
-<th>Estado</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
+
+    <table id="caseTable">
+
+        <thead>
+
+            <tr>
+                <th>Caso</th>
+                <th>Asignado a</th>
+                <th>Última asignación (COT)</th>
+                <th>Horas transcurridas</th>
+                <th>Tiempo</th>
+                <th>Estado</th>
+            </tr>
+
+        </thead>
+
+        <tbody></tbody>
+
+    </table>
+
 </div>
+```
+
+</div>
+
+<div class="footer">
+    Case Aging Dashboard · Procesamiento local en el navegador ·
+    Compatible con GitHub Pages
 </div>
 
 <script>
+
+/* =========================================================
+   CONFIGURACIÓN
+   ========================================================= */
+
+/*
+ * El reporte utiliza hora estándar de Colombia:
+ *
+ * COT = UTC-5
+ *
+ * Todas las fechas del Excel se interpretan como fechas
+ * de Colombia independientemente de la zona horaria
+ * configurada en el computador del usuario.
+ */
+
+const ZONA_COLOMBIA = "America/Bogota";
+
+
 /* =========================================================
    ESTADO GLOBAL
    ========================================================= */
 
-// Datos "crudos": un registro por caso con su último evento de
-// asignación (Campo/Evento = Propietario del caso) y la fecha
-// real de ese evento, ya normalizada a UTC (ver parseFechaCOT).
-let casosRaw = []; // [{ caso, agente, fechaAsignacion: Date }]
+let casosRaw = [];
 
 let autoRefreshTimer = null;
 
+
 /* =========================================================
-   UTILIDADES DE TEXTO / FECHA
+   NORMALIZACIÓN DE TEXTO
    ========================================================= */
 
-// Quita tildes y pasa a minúsculas para poder comparar encabezados
-// sin importar acentos ni mayúsculas.
-function norm(str){
-    return (str === null || str === undefined ? '' : String(str))
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g,'')
+function norm(valor) {
+
+    if (
+        valor === null ||
+        valor === undefined
+    ) {
+        return "";
+    }
+
+    return String(valor)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .trim();
 }
 
-// El reporte se genera en "hora estándar de Colombia/COT" (UTC-5,
-// sin horario de verano). Para que el cálculo de horas transcurridas
-// dé el mismo resultado sin importar la zona horaria del navegador
-// del usuario, toda fecha del Excel se convierte a un instante UTC
-// real sumando 5 horas al valor "de pared" que trae la celda.
-function fechaCOTaUTC(y,m,d,h,min){
-    return new Date(Date.UTC(y, m-1, d, h+5, min, 0));
+
+/* =========================================================
+   FECHA COT → UTC
+   ========================================================= */
+
+/*
+ * Convierte una fecha "de pared" de Colombia a un instante
+ * UTC real.
+ *
+ * Ejemplo:
+ *
+ * 24/09/2026 07:34 AM COT
+ *
+ * equivale a:
+ *
+ * 24/09/2026 12:34 UTC
+ */
+
+function fechaCOTaUTC(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second = 0
+) {
+
+    return new Date(
+        Date.UTC(
+            year,
+            month - 1,
+            day,
+            hour + 5,
+            minute,
+            second
+        )
+    );
 }
 
-// Convierte el valor de la celda "Fecha de modificación" a un Date
-// real, sin importar si SheetJS la entregó como texto
-// ("24/09/2026 07:09 AM"), como número de serie de Excel, o como
-// objeto Date.
-function parseFechaModificacion(value){
-    if (value === null || value === undefined || value === '') return null;
 
-    if (value instanceof Date && !isNaN(value)){
+/* =========================================================
+   PARSEADOR DE FECHAS
+   ========================================================= */
+
+function parseFechaModificacion(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return null;
+    }
+
+
+    /* -----------------------------------------------------
+       CASO 1: Excel entregó un número de serie
+       ----------------------------------------------------- */
+
+    if (typeof value === "number") {
+
+        try {
+
+            const d = XLSX.SSF.parse_date_code(value);
+
+            if (!d) {
+                return null;
+            }
+
+            return fechaCOTaUTC(
+                d.y,
+                d.m,
+                d.d,
+                d.H || 0,
+                d.M || 0,
+                Math.floor(d.S || 0)
+            );
+
+        } catch (error) {
+
+            return null;
+        }
+    }
+
+
+    /* -----------------------------------------------------
+       CASO 2: Date
+       ----------------------------------------------------- */
+
+    if (value instanceof Date) {
+
+        if (isNaN(value.getTime())) {
+            return null;
+        }
+
         return fechaCOTaUTC(
-            value.getFullYear(), value.getMonth()+1, value.getDate(),
-            value.getHours(), value.getMinutes()
+            value.getFullYear(),
+            value.getMonth() + 1,
+            value.getDate(),
+            value.getHours(),
+            value.getMinutes(),
+            value.getSeconds()
         );
     }
 
-    if (typeof value === 'number'){
-        const d = XLSX.SSF.parse_date_code(value);
-        if (!d) return null;
-        return fechaCOTaUTC(d.y, d.m, d.d, d.H || 0, d.M || 0);
+
+    /* -----------------------------------------------------
+       CASO 3: Texto
+       Formato:
+       DD/MM/YYYY HH:MM AM/PM
+       ----------------------------------------------------- */
+
+    const texto = String(value).trim();
+
+    const match = texto.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)$/i
+    );
+
+    if (match) {
+
+        let [
+            ,
+            dd,
+            mm,
+            yyyy,
+            hh,
+            min,
+            sec,
+            ampm
+        ] = match;
+
+        dd = Number(dd);
+        mm = Number(mm);
+        yyyy = Number(yyyy);
+        hh = Number(hh);
+        min = Number(min);
+        sec = Number(sec || 0);
+
+        if (
+            /pm/i.test(ampm) &&
+            hh !== 12
+        ) {
+            hh += 12;
+        }
+
+        if (
+            /am/i.test(ampm) &&
+            hh === 12
+        ) {
+            hh = 0;
+        }
+
+        return fechaCOTaUTC(
+            yyyy,
+            mm,
+            dd,
+            hh,
+            min,
+            sec
+        );
     }
 
-    // Formato esperado: DD/MM/YYYY HH:MM AM/PM
-    const m = String(value).trim().match(
-        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*([AP]M)$/i
-    );
-    if (!m) return null;
 
-    let [, dd, mm, yyyy, hh, min, ampm] = m;
-    dd = +dd; mm = +mm; yyyy = +yyyy; hh = +hh; min = +min;
-    if (/pm/i.test(ampm) && hh !== 12) hh += 12;
-    if (/am/i.test(ampm) && hh === 12) hh = 0;
+    /* -----------------------------------------------------
+       CASO 4: ISO
+       ----------------------------------------------------- */
 
-    return fechaCOTaUTC(yyyy, mm, dd, hh, min);
+    const iso = new Date(texto);
+
+    if (!isNaN(iso.getTime())) {
+
+        return iso;
+    }
+
+
+    return null;
 }
 
+
 /* =========================================================
-   LECTURA DEL EXCEL (reporte "Gestión de Asignaciones")
+   DETECCIÓN DE ENCABEZADOS
    ========================================================= */
 
-function processFile(){
+function detectarEncabezados(matrix) {
 
-    const file = document.getElementById('fileInput').files[0];
+    let headerRowIdx = -1;
 
-    if (!file){
-        setStatus('Selecciona un archivo primero.', 'err-msg');
+    const cols = {};
+
+
+    /*
+     * El reporte de Salesforce puede contener varias
+     * filas antes de los encabezados reales.
+     *
+     * Buscamos automáticamente la fila que contiene
+     * "Número del caso".
+     */
+
+    for (
+        let i = 0;
+        i < Math.min(matrix.length, 60);
+        i++
+    ) {
+
+        const row = matrix[i] || [];
+
+        for (
+            let j = 0;
+            j < row.length;
+            j++
+        ) {
+
+            const celda = norm(row[j]);
+
+            if (
+                celda.includes("numero del caso") ||
+                celda === "case number"
+            ) {
+
+                headerRowIdx = i;
+
+                break;
+            }
+        }
+
+        if (headerRowIdx !== -1) {
+            break;
+        }
+    }
+
+
+    if (headerRowIdx === -1) {
+        return null;
+    }
+
+
+    const headerRow = matrix[headerRowIdx];
+
+
+    headerRow.forEach(
+        (cell, index) => {
+
+            const c = norm(cell);
+
+
+            if (
+                c.includes("numero del caso") ||
+                c === "case number"
+            ) {
+
+                cols.caso = index;
+            }
+
+
+            else if (
+                c.includes("propietario del caso") ||
+                c.includes("case owner")
+            ) {
+
+                cols.propietario = index;
+            }
+
+
+            else if (
+                c.includes("campo") &&
+                c.includes("evento")
+            ) {
+
+                cols.evento = index;
+            }
+
+
+            else if (
+                c.includes("field") &&
+                c.includes("event")
+            ) {
+
+                cols.evento = index;
+            }
+
+
+            else if (
+                c.includes("valor nuevo") ||
+                c === "new value"
+            ) {
+
+                cols.valorNuevo = index;
+            }
+
+
+            else if (
+                c.includes("fecha de modificacion") ||
+                c.includes("last modified date")
+            ) {
+
+                cols.fecha = index;
+            }
+
+        }
+    );
+
+
+    return {
+        headerRowIdx,
+        cols
+    };
+}
+
+
+/* =========================================================
+   PROCESAR ARCHIVO
+   ========================================================= */
+
+function processFile() {
+
+    const fileInput =
+        document.getElementById("fileInput");
+
+    const file =
+        fileInput.files[0];
+
+
+    if (!file) {
+
+        setStatus(
+            "Selecciona un archivo Excel primero.",
+            "err-msg"
+        );
+
         return;
     }
 
-    setStatus('Procesando archivo...', 'info-msg');
-    document.getElementById('btnAnalizar').disabled = true;
+
+    if (
+        !file.name.toLowerCase().endsWith(".xlsx") &&
+        !file.name.toLowerCase().endsWith(".xls")
+    ) {
+
+        setStatus(
+            "El archivo debe ser .xlsx o .xls.",
+            "err-msg"
+        );
+
+        return;
+    }
+
+
+    setStatus(
+        "⏳ Procesando Excel...",
+        "info-msg"
+    );
+
+
+    document.getElementById(
+        "btnAnalizar"
+    ).disabled = true;
+
 
     const reader = new FileReader();
 
-    reader.onload = function(e){
-        try{
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type:'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-            // header:1 => matriz de filas/columnas cruda, tal cual viene
-            // el reporte (con sus filas de metadatos, subtotales, etc.)
-            const matrix = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
+    reader.onload = function(event) {
+
+        try {
+
+            const data =
+                new Uint8Array(
+                    event.target.result
+                );
+
+
+            /*
+             * Importante:
+             *
+             * cellDates:false permite recibir los valores
+             * de fecha de Excel de forma controlada.
+             */
+
+            const workbook =
+                XLSX.read(
+                    data,
+                    {
+                        type: "array",
+                        cellDates: false
+                    }
+                );
+
+
+            if (
+                !workbook.SheetNames ||
+                workbook.SheetNames.length === 0
+            ) {
+
+                throw new Error(
+                    "El archivo no contiene hojas."
+                );
+            }
+
+
+            /*
+             * Se procesa la primera hoja del reporte.
+             */
+
+            const sheet =
+                workbook.Sheets[
+                    workbook.SheetNames[0]
+                ];
+
+
+            const matrix =
+                XLSX.utils.sheet_to_json(
+                    sheet,
+                    {
+                        header: 1,
+                        defval: "",
+                        raw: true
+                    }
+                );
+
+
+            if (!matrix.length) {
+
+                throw new Error(
+                    "La hoja está vacía."
+                );
+            }
+
 
             analizarReporte(matrix);
-        }catch(err){
-            console.error(err);
-            setStatus('❌ No se pudo leer el archivo: ' + err.message, 'err-msg');
-        }finally{
-            document.getElementById('btnAnalizar').disabled = false;
+
+
+            mostrarInformacionArchivo(
+                file,
+                workbook.SheetNames[0]
+            );
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            setStatus(
+                "❌ Error procesando el archivo: " +
+                error.message,
+                "err-msg"
+            );
+
+        } finally {
+
+            document.getElementById(
+                "btnAnalizar"
+            ).disabled = false;
         }
     };
 
-    reader.onerror = function(){
-        setStatus('❌ Error leyendo el archivo.', 'err-msg');
-        document.getElementById('btnAnalizar').disabled = false;
+
+    reader.onerror = function() {
+
+        setStatus(
+            "❌ No fue posible leer el archivo.",
+            "err-msg"
+        );
+
+        document.getElementById(
+            "btnAnalizar"
+        ).disabled = false;
     };
+
 
     reader.readAsArrayBuffer(file);
 }
 
-// Busca, dentro de las primeras filas, la fila de encabezados real
-// (la que contiene "Número del caso"), y devuelve su índice y el
-// índice de cada columna que nos interesa, identificándolas por
-// nombre para no depender de que estén siempre en la misma posición.
-function detectarEncabezados(matrix){
 
-    let headerRowIdx = -1;
-    let cols = {};
+/* =========================================================
+   ANALIZAR REPORTE
+   ========================================================= */
 
-    for (let i = 0; i < Math.min(matrix.length, 50); i++){
-        const row = matrix[i] || [];
-        for (let j = 0; j < row.length; j++){
-            const cell = norm(row[j]);
-            if (cell.includes('numero del caso') || cell === 'case number'){
-                headerRowIdx = i;
-                break;
-            }
-        }
-        if (headerRowIdx !== -1) break;
-    }
+function analizarReporte(matrix) {
 
-    if (headerRowIdx === -1) return null;
+    const detectado =
+        detectarEncabezados(matrix);
 
-    const headerRow = matrix[headerRowIdx];
 
-    headerRow.forEach((cell, idx) => {
-        const c = norm(cell);
-        if (c.includes('numero del caso') || c === 'case number'){
-            cols.caso = idx;
-        } else if (c.includes('propietario del caso') || c.includes('case owner')){
-            cols.propietario = idx;
-        } else if (c.includes('campo') && c.includes('evento')){
-            cols.evento = idx;
-        }else if (c.includes('field') && c.includes('event')){
-            cols.evento = idx;
-        } else if (c.includes('valor nuevo') || c === 'new value'){
-            cols.valorNuevo = idx;
-        } else if (c.includes('fecha de modificacion') || c.includes('last modified date')){
-            cols.fecha = idx;
-        }
-    });
+    if (!detectado) {
 
-    return { headerRowIdx, cols };
-}
+        setStatus(
+            "❌ No se encontró la columna \"Número del caso\". " +
+            "Verifica que sea el reporte de Gestión de Asignaciones.",
+            "err-msg"
+        );
 
-function analizarReporte(matrix){
-
-    const detectado = detectarEncabezados(matrix);
-
-    if (!detectado){
-        setStatus('❌ No se encontró la columna "Número del caso". Verifica que sea el reporte de Gestión de Asignaciones exportado de Salesforce.', 'err-msg');
         return;
     }
 
-    const { headerRowIdx, cols } = detectado;
 
-    if (cols.caso === undefined || cols.evento === undefined || cols.fecha === undefined){
-        setStatus('❌ Faltan columnas obligatorias en el Excel (Número del caso / Campo-Evento / Fecha de modificación).', 'err-msg');
+    const {
+        headerRowIdx,
+        cols
+    } = detectado;
+
+
+    if (
+        cols.caso === undefined ||
+        cols.evento === undefined ||
+        cols.fecha === undefined
+    ) {
+
+        setStatus(
+            "❌ Faltan columnas obligatorias. " +
+            "Se necesitan: Número del caso, Campo / Evento y Fecha de modificación.",
+            "err-msg"
+        );
+
         return;
     }
 
-    // Mapa caso -> { agente, fechaAsignacion } quedándonos siempre con
-    // el evento de "Propietario del caso" MÁS RECIENTE de cada caso.
+
+    /*
+     * mapa:
+     *
+     * caso →
+     * {
+     *    caso,
+     *    agente,
+     *    fechaAsignacion
+     * }
+     *
+     * Si un caso aparece varias veces, solamente
+     * conservamos el evento de propietario cuya fecha
+     * de modificación sea la más reciente.
+     */
+
     const mapa = {};
+
     let currentCase = null;
+
     let filasIgnoradas = 0;
 
-    for (let r = headerRowIdx + 1; r < matrix.length; r++){
+    let eventosPropietario = 0;
 
-        const row = matrix[r] || [];
-        const caseCell = String(row[cols.caso] ?? '').trim();
-        const caseCellLower = caseCell.toLowerCase();
 
-        // Fila "Total" => fin de la tabla de datos.
-        if (caseCellLower === 'total') break;
+    for (
+        let r = headerRowIdx + 1;
+        r < matrix.length;
+        r++
+    ) {
 
-        // Fila "Subtotal" => se ignora, no es un evento.
-        if (caseCellLower === 'subtotal') continue;
+        const row =
+            matrix[r] || [];
 
-        // Si esta fila trae número de caso, abre/continúa ese grupo
-        // (las filas siguientes del mismo caso vienen con esta celda
-        // vacía por el agrupamiento del reporte de Salesforce).
-        if (caseCell) currentCase = caseCell;
 
-        const eventoCell = String(row[cols.evento] ?? '').trim();
+        const caseCell =
+            String(
+                row[cols.caso] ?? ""
+            ).trim();
 
-        // Filas sin Campo/Evento son filas de "Conteo"/estructura, no eventos.
-        if (!eventoCell){
+
+        const caseLower =
+            norm(caseCell);
+
+
+        /*
+         * "Total" indica normalmente el final del reporte.
+         */
+
+        if (caseLower === "total") {
+            break;
+        }
+
+
+        /*
+         * Las filas "Subtotal" no son eventos.
+         */
+
+        if (caseLower === "subtotal") {
             continue;
         }
 
-        if (!norm(eventoCell).includes('propietario') && !norm(eventoCell).includes('owner')){
-            // Por si el archivo trae otros tipos de evento mezclados,
-            // solo nos interesan los cambios de propietario del caso.
+
+        /*
+         * Salesforce puede dejar vacía la columna del caso
+         * en las filas siguientes del mismo grupo.
+         */
+
+        if (caseCell) {
+            currentCase = caseCell;
+        }
+
+
+        const eventoCell =
+            String(
+                row[cols.evento] ?? ""
+            ).trim();
+
+
+        if (!eventoCell) {
             continue;
         }
 
-        if (!currentCase){
+
+        const eventoNormalizado =
+            norm(eventoCell);
+
+
+        /*
+         * Solo nos interesan cambios de:
+         *
+         * Propietario del caso
+         *
+         * o
+         *
+         * Owner
+         */
+
+        if (
+            !eventoNormalizado.includes("propietario") &&
+            !eventoNormalizado.includes("owner")
+        ) {
+
+            continue;
+        }
+
+
+        eventosPropietario++;
+
+
+        if (!currentCase) {
+
             filasIgnoradas++;
+
             continue;
         }
 
-        const fecha = parseFechaModificacion(row[cols.fecha]);
-        if (!fecha){
+
+        const fecha =
+            parseFechaModificacion(
+                row[cols.fecha]
+            );
+
+
+        if (!fecha) {
+
             filasIgnoradas++;
+
             continue;
         }
+
+
+        /*
+         * Preferimos Propietario del caso.
+         *
+         * Si está vacío, usamos Valor nuevo.
+         */
+
+        const propietario =
+            cols.propietario !== undefined
+                ? String(
+                    row[cols.propietario] ?? ""
+                  ).trim()
+                : "";
+
+
+        const valorNuevo =
+            cols.valorNuevo !== undefined
+                ? String(
+                    row[cols.valorNuevo] ?? ""
+                  ).trim()
+                : "";
+
 
         const agente =
-            String(row[cols.propietario] ?? '').trim() ||
-            String(row[cols.valorNuevo] ?? '').trim() ||
-            'Sin asignar';
+            propietario ||
+            valorNuevo ||
+            "Sin asignar";
 
-        if (!mapa[currentCase] || fecha > mapa[currentCase].fechaAsignacion){
-            mapa[currentCase] = { caso: currentCase, agente, fechaAsignacion: fecha };
+
+        /*
+         * AQUÍ ESTÁ LA REGLA PRINCIPAL:
+         *
+         * Para cada caso se conserva únicamente
+         * la fecha de modificación MÁS RECIENTE.
+         */
+
+        if (
+            !mapa[currentCase] ||
+            fecha > mapa[currentCase].fechaAsignacion
+        ) {
+
+            mapa[currentCase] = {
+
+                caso: currentCase,
+
+                agente: agente,
+
+                fechaAsignacion: fecha
+            };
         }
+
     }
 
-    casosRaw = Object.values(mapa);
 
-    if (casosRaw.length === 0){
-        setStatus('⚠️ No se encontraron casos con eventos de "Propietario del caso" en el archivo.', 'err-msg');
-        document.getElementById('btnActualizar').disabled = true;
-        document.getElementById('btnExportar').disabled = true;
+    casosRaw =
+        Object.values(mapa);
+
+
+    if (casosRaw.length === 0) {
+
+        setStatus(
+            "⚠️ No se encontraron casos con eventos de " +
+            "\"Propietario del caso\".",
+            "err-msg"
+        );
+
+        document.getElementById(
+            "btnActualizar"
+        ).disabled = true;
+
+        document.getElementById(
+            "btnExportar"
+        ).disabled = true;
+
         return;
     }
 
-    document.getElementById('btnActualizar').disabled = false;
-    document.getElementById('btnExportar').disabled = false;
+
+    document.getElementById(
+        "btnActualizar"
+    ).disabled = false;
+
+
+    document.getElementById(
+        "btnExportar"
+    ).disabled = false;
+
 
     renderAll();
 
-    let msg = '✅ Procesados ' + casosRaw.length + ' casos.';
-    if (filasIgnoradas > 0) msg += ' (' + filasIgnoradas + ' filas ignoradas por datos incompletos)';
-    setStatus(msg, 'ok-msg');
+
+    let mensaje =
+        "✅ Procesados " +
+        casosRaw.length +
+        " casos.";
+
+
+    if (eventosPropietario > 0) {
+
+        mensaje +=
+            " Eventos de propietario encontrados: " +
+            eventosPropietario +
+            ".";
+    }
+
+
+    if (filasIgnoradas > 0) {
+
+        mensaje +=
+            " Filas ignoradas: " +
+            filasIgnoradas +
+            ".";
+    }
+
+
+    setStatus(
+        mensaje,
+        "ok-msg"
+    );
+
 
     iniciarAutoRefresh();
 }
 
+
 /* =========================================================
-   CÁLCULO Y RENDERIZADO (usa "ahora" en tiempo real)
+   CÁLCULO
    ========================================================= */
 
-function recalcularAhora(){
-    if (casosRaw.length === 0) return;
-    renderAll();
-    setStatus('🔄 Horas recalculadas con la hora actual.', 'ok-msg');
+function calcularDerivados() {
+
+    const ahora =
+        Date.now();
+
+
+    return casosRaw.map(
+        caso => {
+
+            let horas =
+                (
+                    ahora -
+                    caso.fechaAsignacion.getTime()
+                ) /
+                3600000;
+
+
+            /*
+             * Evita valores negativos si el Excel contiene
+             * una fecha futura.
+             */
+
+            if (horas < 0) {
+                horas = 0;
+            }
+
+
+            let estado =
+                "🟢";
+
+
+            if (horas > 4) {
+
+                estado = "🔴";
+
+            } else if (horas > 1) {
+
+                estado = "🟡";
+            }
+
+
+            return {
+
+                ...caso,
+
+                horas,
+
+                estado
+            };
+        }
+    );
 }
 
-function iniciarAutoRefresh(){
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    // Recalcula automáticamente cada minuto para que el "tiempo
-    // transcurrido" se mantenga al día entre carga y carga del Excel.
-    autoRefreshTimer = setInterval(renderAll, 60 * 1000);
-}
 
-function calcularDerivados(){
-    const ahora = new Date();
+/* =========================================================
+   RENDER PRINCIPAL
+   ========================================================= */
 
-    return casosRaw.map(c => {
-        const horas = (ahora - c.fechaAsignacion) / 3600000;
-        let estado = '🟢';
-        if (horas > 4) estado = '🔴';
-        else if (horas > 1) estado = '🟡';
-        return { ...c, horas, estado };
-    });
-}
+function renderAll() {
 
-function renderAll(){
-    const datos = calcularDerivados();
+    const datos =
+        calcularDerivados();
+
+
     renderDashboard(datos);
+
     renderTablaCasos(datos);
+
     renderTablaAgentes(datos);
-    document.getElementById('lastUpdate').textContent =
-        'Última actualización: ' + new Date().toLocaleString('es-CO');
+
+
+    document.getElementById(
+        "lastUpdate"
+    ).textContent =
+        "Última actualización: " +
+        new Date().toLocaleString(
+            "es-CO",
+            {
+                timeZone: ZONA_COLOMBIA
+            }
+        ) +
+        " COT";
 }
 
-function renderDashboard(datos){
-    const mas1h = datos.filter(d => d.horas > 1 && d.horas <= 4).length;
-    const mas4h = datos.filter(d => d.horas > 4).length;
-    const promedio = datos.length
-        ? (datos.reduce((s,d) => s + d.horas, 0) / datos.length).toFixed(1)
-        : 0;
 
-    document.getElementById('totalCasos').textContent = datos.length;
-    document.getElementById('mayor1h').textContent = mas1h;
-    document.getElementById('mayor4h').textContent = mas4h;
-    document.getElementById('promedio').textContent = promedio + 'h';
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+function renderDashboard(datos) {
+
+    const mas1h =
+        datos.filter(
+            d =>
+                d.horas > 1 &&
+                d.horas <= 4
+        ).length;
+
+
+    const mas4h =
+        datos.filter(
+            d =>
+                d.horas > 4
+        ).length;
+
+
+    const promedio =
+        datos.length
+            ? (
+                datos.reduce(
+                    (sum, d) =>
+                        sum + d.horas,
+                    0
+                ) /
+                datos.length
+            ).toFixed(1)
+            : "0";
+
+
+    document.getElementById(
+        "totalCasos"
+    ).textContent =
+        datos.length;
+
+
+    document.getElementById(
+        "mayor1h"
+    ).textContent =
+        mas1h;
+
+
+    document.getElementById(
+        "mayor4h"
+    ).textContent =
+        mas4h;
+
+
+    document.getElementById(
+        "promedio"
+    ).textContent =
+        promedio + "h";
 }
 
-function renderTablaCasos(datos){
-    const tbody = document.querySelector('#caseTable tbody');
-    tbody.innerHTML = '';
 
-    const ordenado = [...datos].sort((a,b) => b.horas - a.horas);
+/* =========================================================
+   TABLA DE CASOS
+   ========================================================= */
 
-    ordenado.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.className = r.horas > 4 ? 'critico' : (r.horas > 1 ? 'alerta' : 'ok');
-        tr.innerHTML = `
-            <td>${escapeHtml(r.caso)}</td>
-            <td>${escapeHtml(r.agente)}</td>
-            <td>${r.fechaAsignacion.toLocaleString('es-CO', { timeZone:'America/Bogota' })}</td>
-            <td>${r.horas.toFixed(1)}</td>
-            <td>${r.estado}</td>
-        `;
-        tbody.appendChild(tr);
-    });
+function renderTablaCasos(datos) {
+
+    const tbody =
+        document.querySelector(
+            "#caseTable tbody"
+        );
+
+
+    tbody.innerHTML = "";
+
+
+    /*
+     * Los casos con mayor antigüedad aparecen primero.
+     */
+
+    const ordenado =
+        [...datos].sort(
+            (a, b) =>
+                b.horas -
+                a.horas
+        );
+
+
+    ordenado.forEach(
+        registro => {
+
+            const tr =
+                document.createElement("tr");
+
+
+            tr.className =
+                registro.horas > 4
+                    ? "critico"
+                    : registro.horas > 1
+                        ? "alerta"
+                        : "ok";
+
+
+            const fecha =
+                formatearFechaCOT(
+                    registro.fechaAsignacion
+                );
+
+
+            const tiempo =
+                formatearDuracion(
+                    registro.horas
+                );
+
+
+            tr.innerHTML = `
+
+                <td>
+                    ${escapeHtml(registro.caso)}
+                </td>
+
+                <td>
+                    ${escapeHtml(registro.agente)}
+                </td>
+
+                <td>
+                    ${fecha}
+                </td>
+
+                <td>
+                    ${registro.horas.toFixed(1)}
+                </td>
+
+                <td>
+                    ${tiempo}
+                </td>
+
+                <td>
+                    ${registro.estado}
+                </td>
+
+            `;
+
+
+            tbody.appendChild(tr);
+        }
+    );
 }
 
-function renderTablaAgentes(datos){
+
+/* =========================================================
+   TABLA DE AGENTES
+   ========================================================= */
+
+function renderTablaAgentes(datos) {
+
     const agentes = {};
 
-    datos.forEach(r => {
-        if (!agentes[r.agente]) agentes[r.agente] = { casos:0, horas:0 };
-        agentes[r.agente].casos++;
-        agentes[r.agente].horas += r.horas;
-    });
 
-    const tbody = document.querySelector('#agentTable tbody');
-    tbody.innerHTML = '';
+    datos.forEach(
+        registro => {
+
+            const nombre =
+                registro.agente ||
+                "Sin asignar";
+
+
+            if (!agentes[nombre]) {
+
+                agentes[nombre] = {
+
+                    casos: 0,
+
+                    horas: 0
+                };
+            }
+
+
+            agentes[nombre].casos++;
+
+            agentes[nombre].horas +=
+                registro.horas;
+        }
+    );
+
+
+    const tbody =
+        document.querySelector(
+            "#agentTable tbody"
+        );
+
+
+    tbody.innerHTML = "";
+
 
     Object.keys(agentes)
-        .sort((a,b) => agentes[b].casos - agentes[a].casos)
-        .forEach(agente => {
-            const a = agentes[agente];
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${escapeHtml(agente)}</td>
-                <td>${a.casos}</td>
-                <td>${(a.horas / a.casos).toFixed(1)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
+
+        .sort(
+            (a, b) =>
+                agentes[b].casos -
+                agentes[a].casos
+        )
+
+        .forEach(
+            agente => {
+
+                const datosAgente =
+                    agentes[agente];
+
+
+                const promedio =
+                    datosAgente.horas /
+                    datosAgente.casos;
+
+
+                const tr =
+                    document.createElement("tr");
+
+
+                tr.innerHTML = `
+
+                    <td>
+                        ${escapeHtml(agente)}
+                    </td>
+
+                    <td>
+                        ${datosAgente.casos}
+                    </td>
+
+                    <td>
+                        ${promedio.toFixed(1)} h
+                    </td>
+
+                `;
+
+
+                tbody.appendChild(tr);
+            }
+        );
 }
+
 
 /* =========================================================
-   BÚSQUEDA / EXPORTACIÓN / HELPERS
+   FORMATO FECHA COT
    ========================================================= */
 
-function filterTable(){
-    const filtro = document.getElementById('searchInput').value.toLowerCase();
-    const rows = document.querySelectorAll('#caseTable tbody tr');
-    rows.forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(filtro) ? '' : 'none';
-    });
+function formatearFechaCOT(fecha) {
+
+    return fecha.toLocaleString(
+        "es-CO",
+        {
+            timeZone: ZONA_COLOMBIA,
+
+            year: "numeric",
+
+            month: "2-digit",
+
+            day: "2-digit",
+
+            hour: "2-digit",
+
+            minute: "2-digit",
+
+            second: "2-digit",
+
+            hour12: true
+        }
+    );
 }
 
-function exportExcel(){
-    if (casosRaw.length === 0) return;
 
-    const datos = calcularDerivados();
-    const filas = datos
-        .sort((a,b) => b.horas - a.horas)
-        .map(r => ({
-            'Caso': r.caso,
-            'Asignado a': r.agente,
-            'Última Asignación (COT)': r.fechaAsignacion.toLocaleString('es-CO', { timeZone:'America/Bogota' }),
-            'Horas Transcurridas': +r.horas.toFixed(2),
-            'Estado': r.estado
-        }));
+/* =========================================================
+   FORMATO DE DURACIÓN
+   ========================================================= */
 
-    const ws = XLSX.utils.json_to_sheet(filas);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Resultado');
-    XLSX.writeFile(wb, 'Case_Aging_Resultado.xlsx');
+function formatearDuracion(horas) {
+
+    const totalMinutos =
+        Math.floor(
+            horas * 60
+        );
+
+
+    const dias =
+        Math.floor(
+            totalMinutos /
+            1440
+        );
+
+
+    const horasRestantes =
+        Math.floor(
+            (
+                totalMinutos %
+                1440
+            ) /
+            60
+        );
+
+
+    const minutos =
+        totalMinutos %
+        60;
+
+
+    if (dias > 0) {
+
+        return (
+            dias +
+            "d " +
+            horasRestantes +
+            "h " +
+            minutos +
+            "m"
+        );
+    }
+
+
+    return (
+        horasRestantes +
+        "h " +
+        minutos +
+        "m"
+    );
 }
 
-function setStatus(msg, cls){
-    const el = document.getElementById('status');
-    el.textContent = msg;
-    el.className = cls || '';
+
+/* =========================================================
+   RECÁLCULO MANUAL
+   ========================================================= */
+
+function recalcularAhora() {
+
+    if (!casosRaw.length) {
+        return;
+    }
+
+
+    renderAll();
+
+
+    setStatus(
+        "🔄 Tiempo recalculado con la hora actual.",
+        "ok-msg"
+    );
 }
 
-function escapeHtml(str){
-    return String(str)
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;');
+
+/* =========================================================
+   ACTUALIZACIÓN AUTOMÁTICA
+   ========================================================= */
+
+function iniciarAutoRefresh() {
+
+    if (autoRefreshTimer) {
+
+        clearInterval(
+            autoRefreshTimer
+        );
+    }
+
+
+    /*
+     * Actualiza cada minuto.
+     */
+
+    autoRefreshTimer =
+        setInterval(
+            function() {
+
+                if (casosRaw.length) {
+
+                    renderAll();
+                }
+
+            },
+            60 * 1000
+        );
 }
 
-// Permite analizar apenas se selecciona el archivo, sin tener que
-// pulsar además el botón (queda igual disponible por comodidad).
-document.getElementById('fileInput').addEventListener('change', function(){
-    if (this.files[0]) processFile();
-});
+
+/* =========================================================
+   BÚSQUEDA
+   ========================================================= */
+
+function filterTable() {
+
+    const filtro =
+        norm(
+            document.getElementById(
+                "searchInput"
+            ).value
+        );
+
+
+    const rows =
+        document.querySelectorAll(
+            "#caseTable tbody tr"
+        );
+
+
+    rows.forEach(
+        row => {
+
+            const texto =
+                norm(
+                    row.innerText
+                );
+
+
+            row.style.display =
+                texto.includes(filtro)
+                    ? ""
+                    : "none";
+        }
+    );
+}
+
+
+/* =========================================================
+   EXPORTAR RESULTADO
+   ========================================================= */
+
+function exportExcel() {
+
+    if (!casosRaw.length) {
+        return;
+    }
+
+
+    const datos =
+        calcularDerivados();
+
+
+    const filas =
+        [...datos]
+
+            .sort(
+                (a, b) =>
+                    b.horas -
+                    a.horas
+            )
+
+            .map(
+                registro => ({
+
+                    "Caso":
+                        registro.caso,
+
+                    "Asignado a":
+                        registro.agente,
+
+                    "Última Asignación (COT)":
+                        formatearFechaCOT(
+                            registro.fechaAsignacion
+                        ),
+
+                    "Horas Transcurridas":
+                        Number(
+                            registro.horas.toFixed(2)
+                        ),
+
+                    "Tiempo":
+                        formatearDuracion(
+                            registro.horas
+                        ),
+
+                    "Estado":
+                        registro.estado
+                })
+            );
+
+
+    const worksheet =
+        XLSX.utils.json_to_sheet(
+            filas
+        );
+
+
+    /*
+     * Ajuste automático aproximado de columnas.
+     */
+
+    worksheet["!cols"] = [
+
+        { wch: 16 },
+
+        { wch: 35 },
+
+        { wch: 25 },
+
+        { wch: 22 },
+
+        { wch: 18 },
+
+        { wch: 12 }
+
+    ];
+
+
+    const workbook =
+        XLSX.utils.book_new();
+
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Resultado"
+    );
+
+
+    XLSX.writeFile(
+        workbook,
+        "Case_Aging_Resultado.xlsx"
+    );
+}
+
+
+/* =========================================================
+   INFORMACIÓN DEL ARCHIVO
+   ========================================================= */
+
+function mostrarInformacionArchivo(
+    file,
+    nombreHoja
+) {
+
+    const info =
+        document.getElementById(
+            "fileInfo"
+        );
+
+
+    info.innerHTML =
+        `
+        <strong>Archivo:</strong>
+        ${escapeHtml(file.name)}
+        &nbsp; | &nbsp;
+
+        <strong>Hoja:</strong>
+        ${escapeHtml(nombreHoja)}
+        &nbsp; | &nbsp;
+
+        <strong>Tamaño:</strong>
+        ${formatearBytes(file.size)}
+        `;
+
+
+    info.style.display = "block";
+}
+
+
+/* =========================================================
+   FORMATO DE BYTES
+   ========================================================= */
+
+function formatearBytes(bytes) {
+
+    if (bytes === 0) {
+        return "0 Bytes";
+    }
+
+
+    const unidades = [
+        "Bytes",
+        "KB",
+        "MB",
+        "GB"
+    ];
+
+
+    const indice =
+        Math.floor(
+            Math.log(bytes) /
+            Math.log(1024)
+        );
+
+
+    return (
+        (
+            bytes /
+            Math.pow(
+                1024,
+                indice
+            )
+        ).toFixed(1) +
+        " " +
+        unidades[indice]
+    );
+}
+
+
+/* =========================================================
+   MENSAJES
+   ========================================================= */
+
+function setStatus(
+    mensaje,
+    clase
+) {
+
+    const elemento =
+        document.getElementById(
+            "status"
+        );
+
+
+    elemento.textContent =
+        mensaje;
+
+
+    elemento.className =
+        clase || "";
+}
+
+
+/* =========================================================
+   SEGURIDAD HTML
+   ========================================================= */
+
+function escapeHtml(valor) {
+
+    return String(valor)
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+}
+
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+
+/*
+ * Cuando el usuario selecciona el Excel,
+ * se procesa automáticamente.
+ */
+
+document
+    .getElementById("fileInput")
+    .addEventListener(
+        "change",
+        function() {
+
+            if (this.files[0]) {
+
+                processFile();
+            }
+        }
+    );
+
+
+/*
+ * Buscador en tiempo real.
+ */
+
+document
+    .getElementById("searchInput")
+    .addEventListener(
+        "input",
+        filterTable
+    );
+
+
+/* =========================================================
+   FIN
+   ========================================================= */
+
 </script>
 
 </body>
