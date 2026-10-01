@@ -1,54 +1,685 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Consulta de Asuntos ESL</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
-        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
-        button { padding: 10px 20px; background-color: #0066cc; color: white; border: none; cursor: pointer; }
-    </style>
-</head>
-<body>
+<!-- Header / Navbar -->
+<header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="bg-brand-500 p-2.5 rounded-xl shadow-md">
+                <i class="fa-solid fa-microscope text-2xl text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Validador de Asuntos ESL 2026</h1>
+                <p class="text-xs text-slate-400">Identificación Crítica: Problemas de Calidad (PQC) & Eventos Adversos (EA/MED)</p>
+            </div>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <nav class="flex space-x-1 bg-slate-800 p-1.5 rounded-xl border border-slate-700 text-sm font-medium">
+            <button type="button" onclick="switchTab('analyzer')" id="tab-analyzer" class="tab-btn px-4 py-2 rounded-lg transition-all duration-150 bg-brand-600 text-white shadow">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Analizador Verbatim
+            </button>
+            <button type="button" onclick="switchTab('checklist')" id="tab-checklist" class="tab-btn px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-150">
+                <i class="fa-solid fa-clipboard-check mr-2"></i>Checklist Guiado
+            </button>
+            <button type="button" onclick="switchTab('database')" id="tab-database" class="tab-btn px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-150">
+                <i class="fa-solid fa-book-bookmark mr-2"></i>Base de Asuntos
+            </button>
+        </nav>
+    </div>
+</header>
 
-    <h2>Buscador / Validador de Asuntos ESL</h2>
-    <p>Ingrese el texto o respuesta del usuario para identificar qué asuntos aplican por coincidencia verbatim:</p>
-    
-    <textarea id="userInput" placeholder="Escriba aquí la consulta o respuesta del usuario..."></textarea>
-    <br>
-    <button onclick="procesarConsulta()">Evaluar Aplicabilidad</button>
+<!-- Main Container -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
 
-    <h3>Asuntos Detectados:</h3>
-    <div id="resultados"></div>
+    <!-- ========================================== -->
+    <!-- TAB 1: ANALIZADOR INTELIGENTE DE VERBATIM -->
+    <!-- ========================================== -->
+    <section id="sec-analyzer" class="tab-content space-y-6">
+        <!-- Instruction Banner -->
+        <div class="bg-blue-50 border-l-4 border-brand-500 p-4 rounded-r-xl shadow-sm flex items-start space-x-3">
+            <i class="fa-solid fa-circle-info text-brand-600 text-xl mt-0.5"></i>
+            <div>
+                <h3 class="font-semibold text-brand-900">Evaluación Automática por Verbatim</h3>
+                <p class="text-sm text-brand-700">Pegue o redacte la descripción del cliente. El sistema analizará instantáneamente patrones de texto para descartar o confirmar alertas de <strong>PQC</strong> y <strong>EA/MED</strong> sin enviar consultas al servidor ni recargar la página.</p>
+            </div>
+        </div>
 
-    <script src="app.js"></script>
-    <script>
-        let db = [];
-        cargarBaseDatos().then(data => db = data);
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Input Column -->
+            <div class="lg:col-span-5 space-y-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <label for="verbatim-input" class="block text-sm font-semibold text-slate-700 flex justify-between items-center">
+                        <span><i class="fa-solid fa-quote-left text-slate-400 mr-2"></i>Verbatim del Cliente:</span>
+                        <span id="char-count" class="text-xs font-normal text-slate-400">0 caracteres</span>
+                    </label>
+                    
+                    <textarea id="verbatim-input" rows="8" 
+                        class="w-full p-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm text-slate-800 placeholder-slate-400 resize-none shadow-inner"
+                        placeholder="Ejemplo: Compré un jarabe la semana pasada, pero vino con la tapa rota y con grumos. Además, al tomarlo me causó una fuerte alergia en la piel y vómitos..."></textarea>
 
-        function procesarConsulta() {
-            const input = document.getElementById('userInput').value;
-            const resultados = evaluarRespuestasUsuario(input, db);
-            const contenedor = document.getElementById('resultados');
-            
-            contenedor.innerHTML = '';
-
-            if (resultados.length === 0) {
-                contenedor.innerHTML = '<p>No se encontraron asuntos aplicables por verbatim.</p>';
-                return;
-            }
-
-            resultados.forEach(asunto => {
-                contenedor.innerHTML += `
-                    <div class="card">
-                        <h4>[${asunto.id_asunto}] ${asunto.asunto}</h4>
-                        <p><strong>Categoría:</strong> ${asunto.categoria}</p>
-                        <p><strong>Definición:</strong> ${asunto.definicion}</p>
+                    <!-- Control Buttons (All with explicit type="button") -->
+                    <div class="flex flex-wrap gap-2 pt-2">
+                        <button type="button" id="btn-analyze" onclick="ejecutarAnalisisVerbatim()" 
+                            class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-4 rounded-xl shadow transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-magnifying-glass font-bold"></i>
+                            <span>Analizar Verbatim</span>
+                        </button>
+                        <button type="button" onclick="cargarEjemplo('pqc_ea')" 
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-3 rounded-xl text-xs transition">
+                            Ejemplo PQC + EA
+                        </button>
+                        <button type="button" onclick="limpiarAnalisis()" 
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 p-2.5 rounded-xl transition" title="Limpiar todo">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
-                `;
-            });
+                </div>
+
+                <!-- Rapid Checklist Prompt -->
+                <div class="bg-slate-900 text-white p-5 rounded-2xl shadow-sm space-y-3">
+                    <h4 class="text-sm font-bold text-amber-400 flex items-center">
+                        <i class="fa-solid fa-shield-cat mr-2 text-lg"></i>Regla de Oro en Clasificación
+                    </h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Si el verbatim describe tanto un fallo físico del producto (PQC) como una reacción adversa o afectación en la salud (EA), <strong>DEBES REGISTRAR AMBOS CÓDIGOS</strong>. Un asunto no anula al otro.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Analysis Results Column -->
+            <div class="lg:col-span-7 space-y-6">
+                <!-- Status / Risk Summary Badge -->
+                <div id="risk-banner" class="hidden p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div id="risk-icon-bg" class="p-3 rounded-xl">
+                            <i id="risk-icon" class="text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 id="risk-title" class="font-bold text-base"></h3>
+                            <p id="risk-desc" class="text-xs mt-0.5"></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="copiarResumen()" class="bg-white/80 hover:bg-white text-slate-700 text-xs font-semibold py-2 px-3 rounded-lg shadow-sm border border-slate-200 transition">
+                        <i class="fa-solid fa-copy mr-1"></i>Copiar Dictamen
+                    </button>
+                </div>
+
+                <!-- Highlighted Verbatim Section -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-highlighter mr-2 text-brand-500"></i>Detección de Palabras Clave en Texto
+                    </h3>
+                    <div id="verbatim-highlighted" class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm leading-relaxed min-h-[80px] text-slate-600 italic">
+                        Escriba un verbatim y presione "Analizar Verbatim" para resaltar términos críticos de PQC y Eventos Adversos.
+                    </div>
+                </div>
+
+                <!-- Matched Asuntos Cards -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                        <span><i class="fa-solid fa-tags mr-2 text-brand-500"></i>Asuntos Sugeridos para Registro:</span>
+                        <span id="match-count" class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-xs font-semibold">0 sugerencias</span>
+                    </h3>
+                    
+                    <div id="matched-asuntos-list" class="space-y-3">
+                        <div class="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-300">
+                            <i class="fa-solid fa-inbox text-3xl text-slate-300 mb-2"></i>
+                            <p class="text-sm text-slate-500">No se han evaluado asuntos aún.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: CHECKLIST GUIADO (ÁRBOL DE DECISIÓN) -->
+    <!-- ========================================== -->
+    <section id="sec-checklist" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 max-w-4xl mx-auto">
+            <div class="border-b border-slate-200 pb-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center">
+                    <i class="fa-solid fa-diagram-project text-brand-600 mr-2"></i>Cuestionario de Validación Operativa de Asuntos Críticos
+                </h2>
+                <p class="text-sm text-slate-500 mt-1">Responda a las siguientes preguntas guía para determinar si debe catalogar un caso como PQC o EA/MED.</p>
+            </div>
+
+            <form id="checklist-form" onsubmit="event.preventDefault(); return false;" class="space-y-6">
+                <!-- Block A: Eventos Adversos -->
+                <div class="p-4 bg-red-50/50 rounded-xl border border-red-100 space-y-4">
+                    <h3 class="text-sm font-bold text-red-900 flex items-center">
+                        <i class="fa-solid fa-heart-pulse text-red-600 mr-2"></i>Módulo 1: Salud y Evento Adverso (EA / MED)
+                    </h3>
+                    
+                    <div class="space-y-3 pl-2">
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_ea1" class="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">1. ¿El usuario/paciente expresa haber presentado algún malestar físico, molestia, alergia, brote o intoxicación tras utilizar el producto?</span>
+                        </label>
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_ea2" class="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">2. ¿Se indica que el producto no surtió el efecto terapéutico o esperado (falta de eficacia)?</span>
+                        </label>
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_ea3" class="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">3. ¿Involucra un uso en situaciones especiales (embarazo, lactancia, sobredosis accidental, uso en menores no indicado)?</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Block B: Problema de Calidad -->
+                <div class="p-4 bg-amber-50/50 rounded-xl border border-amber-100 space-y-4">
+                    <h3 class="text-sm font-bold text-amber-900 flex items-center">
+                        <i class="fa-solid fa-box-open text-amber-600 mr-2"></i>Módulo 2: Estado del Producto (PQC - Problema de Calidad)
+                    </h3>
+                    
+                    <div class="space-y-3 pl-2">
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_pqc1" class="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">1. ¿El producto, empaque o frasco presenta roturas, fisuras, derrames, fugas o sellos defectuosos?</span>
+                        </label>
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_pqc2" class="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">2. ¿El contenido tiene características anómalas (cambio de olor, sabor extraño, color alterado, grumos, partículas flotantes)?</span>
+                        </label>
+                        <label class="flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chk_pqc3" class="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded">
+                            <span class="text-sm text-slate-700">3. ¿El producto llegó vencido o incompleto (falta contenido, frasco semivacío, faltan piezas)?</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="evaluarChecklist()" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-xl shadow transition">
+                        <i class="fa-solid fa-calculator mr-2"></i>Calcular Asuntos Requeridos
+                    </button>
+                </div>
+            </form>
+
+            <!-- Checklist Result Box -->
+            <div id="checklist-result" class="hidden p-5 rounded-2xl border space-y-3">
+                <h4 id="chk-result-title" class="font-bold text-base"></h4>
+                <p id="chk-result-desc" class="text-sm"></p>
+                <div id="chk-result-tags" class="flex flex-wrap gap-2 pt-2"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: BASE DE CONSULTA DE ASUNTOS ESL -->
+    <!-- ========================================== -->
+    <section id="sec-database" class="tab-content hidden space-y-6">
+        <!-- Search & Filters Bar -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div class="relative w-full md:w-96">
+                <i class="fa-solid fa-search absolute left-3.5 top-3 text-slate-400"></i>
+                <input type="text" id="db-search-input" onkeyup="filtrarBaseDatos()" 
+                    placeholder="Buscar por código, nombre o definición..." 
+                    class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            </div>
+
+            <!-- Category Filters -->
+            <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                <button type="button" onclick="filtrarCategoria('TODOS')" class="filter-btn bg-brand-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Todos</button>
+                <button type="button" onclick="filtrarCategoria('CRITICO')" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium">Solo Críticos (PQC/EA)</button>
+                <button type="button" onclick="filtrarCategoria('PQC')" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium">PQC</button>
+                <button type="button" onclick="filtrarCategoria('EA')" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium">EA / MED</button>
+                <button type="button" onclick="filtrarCategoria('OPERATIVO')" class="filter-btn bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium">Operativos</button>
+            </div>
+        </div>
+
+        <!-- Database Grid Container -->
+        <div id="database-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Dynamic Cards Inserted via JS -->
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center space-y-2">
+        <p>Sistema Estático Optimizado para GitHub Pages &copy; 2026. Todos los derechos reservados.</p>
+        <p class="text-slate-500">Diseñado para Acuracidad Operativa en Selección de Asuntos ESL, PQC y Eventos Adversos.</p>
+    </div>
+</footer>
+
+<!-- JavaScript Application Logic -->
+<script>
+    // =========================================================================
+    // 1. BASE DE DATOS UNIFICADA (Matriz ESL 2026 + Definiciones de Calidad y EA)
+    // =========================================================================
+    const BASE_DATOS_ASUNTOS = [
+        {
+            id: "ESL-EA-01",
+            asunto: "Evento Adverso / Reacción Adversas (EA / MED)",
+            categoria: "EA",
+            esCritico: true,
+            definicion: "Cualquier ocurrencia médica desfavorable en un paciente o consumidor al que se le administró un producto, que no necesariamente tiene una relación causal con este tratamiento. Incluye brotes, mareos, ardor, dolor o intoxicación.",
+            terminos: ["alergia", "brote", "sintoma", "vomito", "ardor", "quemadura", "intoxicacion", "dolor", "urgencias", "hospital", "reaccion", "molestia", "efecto secundario"],
+            preguntas: [
+                "¿El cliente reporta alguna molestia o alteración física o emocional tras usar el producto?",
+                "¿Requirió atención médica o suspensión inmediata?"
+            ]
+        },
+        {
+            id: "ESL-EA-02",
+            asunto: "Falta de Eficacia / Inefectividad del Tratamiento",
+            categoria: "EA",
+            esCritico: true,
+            definicion: "Situación en la que el producto no produce el efecto terapéutico o esperado según la indicación autorizada o promovida.",
+            terminos: ["no sirve", "no funciono", "no quito el dolor", "sigo igual", "no hace nada", "falta de eficacia", "inefectivo"],
+            preguntas: [
+                "¿El usuario afirma que usó el producto según las instrucciones pero no tuvo el resultado esperado?"
+            ]
+        },
+        {
+            id: "ESL-EA-03",
+            asunto: "Caso Especial: Embarazo / Sobredosis / Off-Label",
+            categoria: "EA",
+            esCritico: true,
+            definicion: "Reportes de exposición durante el embarazo o lactancia, sobredosis accidental o intencionada, o uso fuera de indicación autorizada.",
+            terminos: ["embarazada", "embarazo", "lactando", "bebe", "sobredosis", "doble dosis", "tomé de más", "uso en niños"],
+            preguntas: [
+                "¿Se menciona uso durante gestación o dosis mayor a la prescrita?"
+            ]
+        },
+        {
+            id: "ESL-PQC-01",
+            asunto: "Problema de Calidad: Defecto Físico / Empaque (PQC)",
+            categoria: "PQC",
+            esCritico: true,
+            definicion: "Cualquier anomalía física, mecánica o estética en el contenedor primario/secundario, como tapas rotas, fugas, sellos violados o roturas.",
+            terminos: ["roto", "danado", "fuga", "derramado", "destapado", "sello", "frasco partido", "valvula no sirve", "quebrado"],
+            preguntas: [
+                "¿El empaque o frasco llegó en mal estado físico?",
+                "¿Presenta pérdida de contenido o falta de hermeticidad?"
+            ]
+        },
+        {
+            id: "ESL-PQC-02",
+            asunto: "Problema de Calidad: Alteración Organoléptica / Contenido",
+            categoria: "PQC",
+            esCritico: true,
+            definicion: "Cambios en las propiedades físicas del contenido, como sabor desagradable, mal olor, cambio de color, precipitado, grumos o presencia de partículas extrañas.",
+            terminos: ["grumos", "huele feo", "olor raro", "sabe amargo", "sabor extraño", "particula", "basura", "turbio", "color raro", "sedimento"],
+            preguntas: [
+                "¿El contenido tiene un aspecto, olor o sabor distinto al normal?"
+            ]
+        },
+        {
+            id: "ESL-PQC-03",
+            asunto: "Problema de Calidad: Contenido Incompleto o Faltante",
+            categoria: "PQC",
+            esCritico: true,
+            definicion: "Casos donde el producto viene sin la cantidad declarada, empaques vacíos o faltantes de componentes/insertos obligatorios.",
+            terminos: ["vacio", "incompleto", "faltan pastillas", "caja vacia", "no trajo inserto", "semivacio", "menos cantidad"],
+            preguntas: [
+                "¿Falta contenido físico o componentes en la unidad recibida?"
+            ]
+        },
+        {
+            id: "ESL-OP-01",
+            asunto: "Solicitud de Cambio o Devolución Comercial",
+            categoria: "OPERATIVO",
+            esCritico: false,
+            definicion: "Trámite solicitado por el cliente para cambiar un producto por motivos no vinculados a fallas técnicas ni problemas de salud.",
+            terminos: ["devolucion", "cambio", "reembolso", "no lo quiero", "me equivoque de producto", "comprar otro"],
+            preguntas: [
+                "¿El cliente solo desea reemplazar el producto sin que exista un daño o síntoma?"
+            ]
+        },
+        {
+            id: "ESL-OP-02",
+            asunto: "Inquietud / Consulta de Información o Modo de Uso",
+            categoria: "OPERATIVO",
+            esCritico: false,
+            definicion: "Consultas generales sobre posología, modo de empleo, precio, disponibilidad o puntos de venta.",
+            terminos: ["como se toma", "para que sirve", "cuanto cuesta", "precio", "donde comprar", "disponibilidad", "posologia"],
+            preguntas: [
+                "¿Es únicamente una pregunta informativa?"
+            ]
+        },
+        {
+            id: "ESL-OP-03",
+            asunto: "Inconformidad con Logística / Tiempo de Entrega",
+            categoria: "OPERATIVO",
+            esCritico: false,
+            definicion: "Reclamación asociada a retrasos en el transporte, mala atención del mensajero o errores en la dirección de despacho.",
+            terminos: ["demora", "tardanza", "no ha llegado", "repartidor", "transporte", "envio retrasado", "guia"],
+            preguntas: [
+                "¿La queja es exclusivamente sobre el servicio de entrega?"
+            ]
         }
-    </script>
-</body>
-</html>
+    ];
+
+    let categoriaFiltroActual = 'TODOS';
+
+    // =========================================================================
+    // 2. INICIALIZACIÓN & EVENTOS
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        renderizarBaseDatos(BASE_DATOS_ASUNTOS);
+        
+        // Contador de caracteres en tiempo real
+        const inputArea = document.getElementById('verbatim-input');
+        inputArea.addEventListener('input', (e) => {
+            document.getElementById('char-count').innerText = `${e.target.value.length} caracteres`;
+        });
+
+        // Evitar envíos accidentales de formularios con Enter
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // Cambio de Pestañas
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('bg-brand-600', 'text-white', 'shadow');
+            btn.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-slate-700');
+        });
+
+        document.getElementById(`sec-${tabName}`).classList.remove('hidden');
+        const activeBtn = document.getElementById(`tab-${tabName}`);
+        activeBtn.classList.add('bg-brand-600', 'text-white', 'shadow');
+        activeBtn.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-slate-700');
+    }
+
+    // =========================================================================
+    // 3. MOTOR DE ANÁLISIS DE VERBATIM
+    // =========================================================================
+    function ejecutarAnalisisVerbatim() {
+        const rawText = document.getElementById('verbatim-input').value.trim();
+        if (!rawText) {
+            alert("Por favor ingrese o pegue un texto de verbatim para realizar el análisis.");
+            return;
+        }
+
+        const cleanText = normalizarTexto(rawText);
+        let matches = [];
+        let highlightedHtml = rawText;
+
+        let detectoEA = false;
+        let detectoPQC = false;
+
+        // Analizar coincidencia por cada asunto
+        BASE_DATOS_ASUNTOS.forEach(item => {
+            let terminosEncontrados = [];
+            item.terminos.forEach(term => {
+                const cleanTerm = normalizarTexto(term);
+                if (cleanText.includes(cleanTerm)) {
+                    terminosEncontrados.push(term);
+                    if (item.categoria === 'EA') detectoEA = true;
+                    if (item.categoria === 'PQC') detectoPQC = true;
+
+                    // Resaltado visual en el texto
+                    const regex = new RegExp(`(${term})`, 'gi');
+                    const cssClass = item.categoria === 'EA' ? 'highlight-ea' : (item.categoria === 'PQC' ? 'highlight-pqc' : 'highlight-gen');
+                    highlightedHtml = highlightedHtml.replace(regex, `<span class="${cssClass}">$1</span>`);
+                }
+            });
+
+            if (terminosEncontrados.length > 0) {
+                matches.push({
+                    asuntoObj: item,
+                    coincidencias: terminosEncontrados
+                });
+            }
+        });
+
+        // Renderizar Texto Resaltado
+        document.getElementById('verbatim-highlighted').innerHTML = highlightedHtml;
+
+        // Renderizar Banner de Riesgo y Sugerencias
+        renderizarBannerRiesgo(detectoEA, detectoPQC, matches.length);
+        renderizarSugerencias(matches);
+    }
+
+    function normalizarTexto(str) {
+        return str
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function renderizarBannerRiesgo(hasEA, hasPQC, totalMatches) {
+        const banner = document.getElementById('risk-banner');
+        const iconBg = document.getElementById('risk-icon-bg');
+        const icon = document.getElementById('risk-icon');
+        const title = document.getElementById('risk-title');
+        const desc = document.getElementById('risk-desc');
+
+        banner.classList.remove('hidden', 'bg-red-50', 'border-red-200', 'bg-amber-50', 'border-amber-200', 'bg-blue-50', 'border-blue-200');
+
+        if (hasEA && hasPQC) {
+            banner.classList.add('bg-red-50', 'border-red-200');
+            iconBg.className = "p-3 rounded-xl bg-red-100 text-red-700";
+            icon.className = "fa-solid fa-triangle-exclamation text-2xl";
+            title.className = "font-bold text-base text-red-900";
+            title.innerText = "ALERTA CRÍTICA: Se detectó PQC + Evento Adverso (EA/MED)";
+            desc.className = "text-xs mt-0.5 text-red-700";
+            desc.innerText = "ATENCIÓN: Debe tipificar OBLIGATORIAMENTE tanto el código de Problema de Calidad como el de Evento Adverso.";
+        } else if (hasEA) {
+            banner.classList.add('bg-red-50', 'border-red-200');
+            iconBg.className = "p-3 rounded-xl bg-red-100 text-red-700";
+            icon.className = "fa-solid fa-heart-pulse text-2xl";
+            title.className = "font-bold text-base text-red-900";
+            title.innerText = "ALERTA REGULATORIA: Se detectó Evento Adverso (EA / MED)";
+            desc.className = "text-xs mt-0.5 text-red-700";
+            desc.innerText = "Requiere notificación al equipo de Farmacovigilancia / Tecnovigilancia según protocolo.";
+        } else if (hasPQC) {
+            banner.classList.add('bg-amber-50', 'border-amber-200');
+            iconBg.className = "p-3 rounded-xl bg-amber-100 text-amber-700";
+            icon.className = "fa-solid fa-box-open text-2xl";
+            title.className = "font-bold text-base text-amber-900";
+            title.innerText = "ALERTA TÉCNICA: Se detectó Problema de Calidad (PQC)";
+            desc.className = "text-xs mt-0.5 text-amber-700";
+            desc.innerText = "Asigne el código correspondiente a la falla técnica o física del producto/empaque.";
+        } else {
+            banner.classList.add('bg-blue-50', 'border-blue-200');
+            iconBg.className = "p-3 rounded-xl bg-blue-100 text-blue-700";
+            icon.className = "fa-solid fa-circle-check text-2xl";
+            title.className = "font-bold text-base text-blue-900";
+            title.innerText = totalMatches > 0 ? "Asunto Operativo Estándar" : "Sin Coincidencias Críticas Directas";
+            desc.className = "text-xs mt-0.5 text-blue-700";
+            desc.innerText = "No se detectaron disparadores directos de PQC o EA. Verifique las sugerencias generales.";
+        }
+    }
+
+    function renderizarSugerencias(matches) {
+        const listContainer = document.getElementById('matched-asuntos-list');
+        document.getElementById('match-count').innerText = `${matches.length} sugerencias`;
+        listContainer.innerHTML = '';
+
+        if (matches.length === 0) {
+            listContainer.innerHTML = `
+                <div class="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-300">
+                    <i class="fa-solid fa-circle-question text-3xl text-slate-300 mb-2"></i>
+                    <p class="text-sm text-slate-600 font-medium">No se hallaron coincidencias automáticas en el texto.</p>
+                    <p class="text-xs text-slate-400 mt-1">Utilice el Checklist Guiado para validar manualmente el caso.</p>
+                </div>
+            `;
+            return;
+        }
+
+        matches.forEach(m => {
+            const a = m.asuntoObj;
+            const badgeColor = a.categoria === 'EA' ? 'bg-red-100 text-red-800 border-red-200' : 
+                              (a.categoria === 'PQC' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200');
+            
+            listContainer.innerHTML += `
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex justify-between items-start gap-2">
+                        <div>
+                            <span class="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor} mb-1">
+                                [${a.id}] ${a.categoria}
+                            </span>
+                            <h4 class="font-bold text-sm text-slate-900">${a.asunto}</h4>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 leading-relaxed">${a.definicion}</p>
+                    <div class="bg-slate-50 p-2.5 rounded-lg text-xs space-y-1">
+                        <span class="font-semibold text-slate-500">Gatillos encontrados en verbatim:</span>
+                        <div class="flex flex-wrap gap-1">
+                            ${m.coincidencias.map(c => `<span class="bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-700 font-mono">${c}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // =========================================================================
+    // 4. CHECKLIST EVALUATOR LOGIC
+    // =========================================================================
+    function evaluarChecklist() {
+        const ea1 = document.getElementById('chk_ea1').checked;
+        const ea2 = document.getElementById('chk_ea2').checked;
+        const ea3 = document.getElementById('chk_ea3').checked;
+
+        const pqc1 = document.getElementById('chk_pqc1').checked;
+        const pqc2 = document.getElementById('chk_pqc2').checked;
+        const pqc3 = document.getElementById('chk_pqc3').checked;
+
+        const box = document.getElementById('checklist-result');
+        const title = document.getElementById('chk-result-title');
+        const desc = document.getElementById('chk-result-desc');
+        const tags = document.getElementById('chk-result-tags');
+
+        box.classList.remove('hidden', 'bg-red-50', 'border-red-200', 'bg-amber-50', 'border-amber-200', 'bg-slate-50', 'border-slate-200');
+        tags.innerHTML = '';
+
+        const reqEA = ea1 || ea2 || ea3;
+        const reqPQC = pqc1 || pqc2 || pqc3;
+
+        if (reqEA && reqPQC) {
+            box.classList.add('bg-red-50', 'border-red-200');
+            title.className = "font-bold text-base text-red-900";
+            title.innerText = "Dictamen: REGISTRO DOBLE OBLIGATORIO (PQC + EA)";
+            desc.className = "text-sm text-red-700";
+            desc.innerText = "Según las respuestas marcadas, el caso reúne condiciones tanto de falla técnica de producto como de afectación a la salud. Debe agregar ambos códigos.";
+            tags.innerHTML = `
+                <span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">ASUNTO EA / MED</span>
+                <span class="bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full">ASUNTO PQC</span>
+            `;
+        } else if (reqEA) {
+            box.classList.add('bg-red-50', 'border-red-200');
+            title.className = "font-bold text-base text-red-900";
+            title.innerText = "Dictamen: REGISTRAR CÓDIGO DE EVENTO ADVERSO (EA / MED)";
+            desc.className = "text-sm text-red-700";
+            desc.innerText = "El caso involucra afectación en la salud, síntomas o falta de eficacia esperada.";
+            tags.innerHTML = `<span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full">ASUNTO EA / MED</span>`;
+        } else if (reqPQC) {
+            box.classList.add('bg-amber-50', 'border-amber-200');
+            title.className = "font-bold text-base text-amber-900";
+            title.innerText = "Dictamen: REGISTRAR CÓDIGO DE PROBLEMA DE CALIDAD (PQC)";
+            desc.className = "text-sm text-amber-700";
+            desc.innerText = "El caso corresponde a un defecto físico, empaque o anomalía de contenido sin afectación en la salud.";
+            tags.innerHTML = `<span class="bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full">ASUNTO PQC</span>`;
+        } else {
+            box.classList.add('bg-slate-50', 'border-slate-200');
+            title.className = "font-bold text-base text-slate-800";
+            title.innerText = "Dictamen: ASUNTO OPERATIVO / GENERAL";
+            desc.className = "text-sm text-slate-600";
+            desc.innerText = "No se identificaron factores críticos de PQC ni EA. Puede clasificar como trámite comercial, consulta u orientación.";
+            tags.innerHTML = `<span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">ASUNTO OPERATIVO</span>`;
+        }
+    }
+
+    // =========================================================================
+    // 5. RENDERING & FILTERS FOR DATABASE
+    // =========================================================================
+    function renderizarBaseDatos(lista) {
+        const grid = document.getElementById('database-grid');
+        grid.innerHTML = '';
+
+        lista.forEach(item => {
+            const badgeColor = item.categoria === 'EA' ? 'bg-red-100 text-red-800 border-red-200' : 
+                              (item.categoria === 'PQC' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200');
+
+            grid.innerHTML += `
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-start">
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${badgeColor}">
+                                ${item.id}
+                            </span>
+                            ${item.esCritico ? '<span class="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded font-semibold border border-red-100"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Crítico</span>' : ''}
+                        </div>
+                        <h3 class="font-bold text-slate-900 text-base leading-snug">${item.asunto}</h3>
+                        <p class="text-xs text-slate-600 leading-relaxed">${item.definicion}</p>
+                    </div>
+
+                    <div class="space-y-2 border-t border-slate-100 pt-3">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Disparadores / Términos clave:</span>
+                        <div class="flex flex-wrap gap-1">
+                            ${item.terminos.map(t => `<span class="bg-slate-100 text-slate-600 text-[11px] px-2 py-0.5 rounded">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function filtrarBaseDatos() {
+        const text = normalizarTexto(document.getElementById('db-search-input').value);
+        const filtrados = BASE_DATOS_ASUNTOS.filter(i => {
+            const matchCategory = categoriaFiltroActual === 'TODOS' || 
+                                 (categoriaFiltroActual === 'CRITICO' && i.esCritico) || 
+                                 i.categoria === categoriaFiltroActual;
+            const matchText = normalizarTexto(i.asunto).includes(text) || 
+                              normalizarTexto(i.definicion).includes(text) || 
+                              normalizarTexto(i.id).includes(text);
+            return matchCategory && matchText;
+        });
+        renderizarBaseDatos(filtrados);
+    }
+
+    function filtrarCategoria(cat) {
+        categoriaFiltroActual = cat;
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('bg-brand-600', 'text-white');
+            btn.classList.add('bg-slate-100', 'text-slate-600');
+        });
+        event.target.classList.remove('bg-slate-100', 'text-slate-600');
+        event.target.classList.add('bg-brand-600', 'text-white');
+        filtrarBaseDatos();
+    }
+
+    // =========================================================================
+    // 6. UTILIDADES & ACCIONES
+    // =========================================================================
+    function cargarEjemplo(tipo) {
+        if (tipo === 'pqc_ea') {
+            document.getElementById('verbatim-input').value = "El cliente indica que compró un frasco la semana pasada pero venía con la tapa rota y derramado (PQC). Además relata que al probarlo le causó un brote severo en los brazos y vómito (EA). Solicita devolución.";
+            document.getElementById('char-count').innerText = `${document.getElementById('verbatim-input').value.length} caracteres`;
+            ejecutarAnalisisVerbatim();
+        }
+    }
+
+    function limpiarAnalisis() {
+        document.getElementById('verbatim-input').value = '';
+        document.getElementById('char-count').innerText = '0 caracteres';
+        document.getElementById('verbatim-highlighted').innerHTML = 'Escriba un verbatim y presione "Analizar Verbatim" para resaltar términos críticos de PQC y Eventos Adversos.';
+        document.getElementById('risk-banner').classList.add('hidden');
+        document.getElementById('matched-asuntos-list').innerHTML = `
+            <div class="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-300">
+                <i class="fa-solid fa-inbox text-3xl text-slate-300 mb-2"></i>
+                <p class="text-sm text-slate-500">No se han evaluado asuntos aún.</p>
+            </div>
+        `;
+        document.getElementById('match-count').innerText = '0 sugerencias';
+    }
+
+    function copiarResumen() {
+        const title = document.getElementById('risk-title').innerText;
+        const desc = document.getElementById('risk-desc').innerText;
+        const textToCopy = `[DICTAMEN DE ACURACIDAD ESL]\n${title}\n${desc}`;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert("Dictamen copiado al portapapeles con éxito.");
+        });
+    }
+</script>
