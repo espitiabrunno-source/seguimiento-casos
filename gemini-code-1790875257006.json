@@ -1,0 +1,17 @@
+[
+  {
+    "id_asunto": "ESL-01",
+    "asunto": "Nombre del Asunto del Excel",
+    "categoria": "Categoría Principal",
+    "definicion": "Definición textual extraída del archivo PDF.",
+    "terminos_verbatim": [
+      "término exacto 1",
+      "frase textual 2",
+      "palabra clave exacta"
+    ],
+    "preguntas_clave": [
+      "¿Pregunta de validación 1?",
+      "¿Pregunta de validación 2?"
+    ]
+  }
+]

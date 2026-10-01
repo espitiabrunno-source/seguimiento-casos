@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Consulta de Asuntos ESL</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
+        button { padding: 10px 20px; background-color: #0066cc; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>Buscador / Validador de Asuntos ESL</h2>
+    <p>Ingrese el texto o respuesta del usuario para identificar qué asuntos aplican por coincidencia verbatim:</p>
+    
+    <textarea id="userInput" placeholder="Escriba aquí la consulta o respuesta del usuario..."></textarea>
+    <br>
+    <button onclick="procesarConsulta()">Evaluar Aplicabilidad</button>
+
+    <h3>Asuntos Detectados:</h3>
+    <div id="resultados"></div>
+
+    <script src="app.js"></script>
+    <script>
+        let db = [];
+        cargarBaseDatos().then(data => db = data);
+
+        function procesarConsulta() {
+            const input = document.getElementById('userInput').value;
+            const resultados = evaluarRespuestasUsuario(input, db);
+            const contenedor = document.getElementById('resultados');
+            
+            contenedor.innerHTML = '';
+
+            if (resultados.length === 0) {
+                contenedor.innerHTML = '<p>No se encontraron asuntos aplicables por verbatim.</p>';
+                return;
+            }
+
+            resultados.forEach(asunto => {
+                contenedor.innerHTML += `
+                    <div class="card">
+                        <h4>[${asunto.id_asunto}] ${asunto.asunto}</h4>
+                        <p><strong>Categoría:</strong> ${asunto.categoria}</p>
+                        <p><strong>Definición:</strong> ${asunto.definicion}</p>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
